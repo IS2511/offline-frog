@@ -4,3 +4,6 @@
 
 # Ignore rust build directories.
 target
+
+# Ignore custom bot configuration.
+/.env
