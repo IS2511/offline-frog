@@ -1,0 +1,6 @@
+# Ignore JetBrains IDE environment/config, but do share run configurations.
+/.idea/*
+!/.idea/runConfigurations
+
+# Ignore rust build directories.
+target
