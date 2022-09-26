@@ -1,11 +1,11 @@
 use dotenv::dotenv;
-use sqlx::sqlite::SqlitePoolOptions;
+use tokio::sync::mpsc;
 
 mod discord;
 mod twitch;
-// mod db;
+mod db;
 
-// use db::KvStore;
+use discord::DiscordMessageRequest;
 
 #[tokio::main]
 async fn main() {
@@ -18,40 +18,37 @@ async fn main() {
 
     // db.set("test".to_string(), "test".to_string()).await;
 
-    let pool = SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect("sqlite:local.db?mode=rwc")
-        .await
-        .expect("Failed to connect to database");
+    let db_pool = db::setup()
+        .await.expect("Failed to setup database");
 
-    sqlx::query(
-        r#"CREATE TABLE IF NOT EXISTS channels
-                (
-                    id              INTEGER PRIMARY KEY,
-                    discord_user_id STRING NOT NULL,
-                    channel         STRING NOT NULL
-                )
-            "#).execute(&pool).await.expect("create channels table");
+    let discord_db_con = db_pool.acquire()
+        .await.expect("Failed to acquire database connection");
+    let twitch_db_con = db_pool.acquire()
+        .await.expect("Failed to acquire database connection");
 
-    sqlx::query(
-        r#"CREATE TABLE IF NOT EXISTS triggers
-                (
-                    id              INTEGER PRIMARY KEY,
-                    discord_user_id STRING NOT NULL,
-                    trigger         STRING NOT NULL,
-                    case_sensitive  BOOLEAN DEFAULT FALSE,
-                    regex           BOOLEAN DEFAULT FALSE
-                )
-            "#).execute(&pool).await.expect("create triggers table");
+    let (discord_tx, mut discord_rx) = mpsc::channel::<Box<DiscordMessageRequest>>(10_000);
 
     // Run discord bot
     let discord_handle = tokio::spawn(async move {
-        discord::start().await
+        let client = discord::start(discord_db_con, discord_rx).await;
+
+        let cache_and_http = client.cache_and_http.clone();
+
+        tokio::spawn(async move {
+            while let Some(mut msg) = discord_rx.recv().await {
+                match discord::send_discord_dm(cache_and_http.clone(), msg).await {
+                    Ok(_) => {},
+                    Err(e) => {
+                        println!("[DS] Error sending direct message: {}", e);
+                    }
+                }
+            }
+        });
     });
 
     // Run twitch listener
     let twitch_handle = tokio::spawn(async move {
-        twitch::start().await
+        twitch::start(twitch_db_con, discord_tx).await
     });
 
     discord_handle.await.expect("Discord thread panicked");

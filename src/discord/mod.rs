@@ -1,15 +1,24 @@
 
 use std::collections::HashSet;
 use std::env;
+use std::sync::Arc;
 
-use serenity::async_trait;
+use serenity::{async_trait, CacheAndHttp};
+use serenity::builder::CreateMessage;
 use serenity::prelude::*;
-use serenity::framework::standard::{StandardFramework};
+use serenity::model::prelude::*;
 use serenity::model::id::UserId;
-use serenity::model::prelude::{Activity};
-// use crate::db::KvStorage;
+use serenity::framework::standard::{StandardFramework};
+use serenity::http::CacheHttp;
+use serenity::utils::MessageBuilder;
 
-// use crate::KvStore;
+use tokio::sync::mpsc;
+
+pub struct DiscordMessageRequest<'a> {
+    pub user_id: UserId,
+    pub message: CreateMessage<'a>,
+}
+
 
 mod com;
 
@@ -27,14 +36,14 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, ctx: Context, ready: serenity::model::gateway::Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         println!("`{}` connected!", ready.user.tag());
 
         ctx.set_activity(Activity::playing("DM frog!help")).await;
     }
 }
 
-pub async fn start() {
+pub async fn start(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, mut rx: mpsc::Receiver<Box<DiscordMessageRequest<'_>>>) -> Client {
     let prefix = env::var("DISCORD_PREFIX").unwrap_or_else(|_| "frog!".to_string());
 
     // Configure discord bot
@@ -64,8 +73,25 @@ pub async fn start() {
     d_client.data.write().await.insert::<CommandPrefix>(prefix.clone());
     // d_client.data.write().await.insert::<KvStorageTMK>(db);
 
-    // Start a single discord bot shard
-    if let Err(why) = d_client.start().await {
-        println!("[DS] An error occurred while running the client: {:?}", why);
-    }
+    let cache_and_http = d_client.cache_and_http.clone();
+    // let rx = Arc::new(RwLock::new(rx));
+
+
+    d_client
+
+    // // Start a single discord bot shard
+    // if let Err(why) = d_client.start().await {
+    //     println!("[DS] An error occurred while running the client: {:?}", why);
+    // }
+
+    // sender_handle.await.expect("Discord sender thread panicked");
+}
+
+pub async fn send_discord_dm(cache_and_http: Arc<CacheAndHttp>, mut msg: Box<DiscordMessageRequest<'_>>) -> std::result::Result<(), serenity::Error> {
+    msg.user_id
+        .create_dm_channel(cache_and_http.clone()).await?
+        .send_message(cache_and_http.http(),|m|
+            &mut msg.message
+        ).await?;
+    Ok(())
 }
