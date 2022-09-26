@@ -6,6 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+dotenv = "0.15"
+clap = "4.0.0-rc.2"
 serenity = "0.11"
 tokio = { version = "1.21", features = ["macros", "rt-multi-thread"] }
-dotenv = "0.15"
+irc = "0.15"
+futures-util = "0.3"
+rand = "0.8"
+#surrealdb = "1.0.0-beta.7"
+#tikv-client = "0.1"
+async-trait = "0.1"
+
+sqlx = { version = "0.6", features = [ "runtime-tokio-rustls", "sqlite" ] }
+

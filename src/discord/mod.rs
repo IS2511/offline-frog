@@ -7,6 +7,9 @@ use serenity::prelude::*;
 use serenity::framework::standard::{StandardFramework};
 use serenity::model::id::UserId;
 use serenity::model::prelude::{Activity};
+// use crate::db::KvStorage;
+
+// use crate::KvStore;
 
 mod com;
 
@@ -14,6 +17,11 @@ struct CommandPrefix;
 impl TypeMapKey for CommandPrefix {
     type Value = String;
 }
+
+// struct KvStorageTMK;
+// impl TypeMapKey for KvStorageTMK {
+//     type Value = Arc<KvStorage>;
+// }
 
 struct Handler;
 
@@ -54,9 +62,10 @@ pub async fn start() {
         .expect("Error creating client");
 
     d_client.data.write().await.insert::<CommandPrefix>(prefix.clone());
+    // d_client.data.write().await.insert::<KvStorageTMK>(db);
 
     // Start a single discord bot shard
     if let Err(why) = d_client.start().await {
-        println!("An error occurred while running the client: {:?}", why);
+        println!("[DS] An error occurred while running the client: {:?}", why);
     }
 }
