@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS triggers
     regex           BOOLEAN DEFAULT FALSE
 );
 
-DELETE FROM channels;
-DELETE FROM triggers;
+-- DELETE FROM channels;
+-- DELETE FROM triggers;
 
 INSERT INTO channels (discord_user_id, channel) VALUES ('206528846026113024', 'weest');
 INSERT INTO channels (discord_user_id, channel) VALUES ('206528846026113024', 'tajj');
