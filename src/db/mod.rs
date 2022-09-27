@@ -1,4 +1,4 @@
-use sqlx::prelude::*;
+// use sqlx::prelude::*;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};
 
@@ -8,7 +8,7 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
     let pool = SqlitePoolOptions::new()
         .min_connections(2)
         .max_connections(3)
-        .connect("sqlite:local.db?mode=rwc")
+        .connect("sqlite:local.sqlite?mode=rwc")
         .await
         .expect("Failed to connect to database");
 
@@ -18,7 +18,7 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
         r#"CREATE TABLE IF NOT EXISTS channels
                 (
                     id              INTEGER PRIMARY KEY,
-                    discord_user_id STRING NOT NULL,
+                    discord_user_id INTEGER NOT NULL,
                     channel         STRING NOT NULL
                 )
             "#).execute(&pool).await?;
@@ -27,7 +27,7 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
         r#"CREATE TABLE IF NOT EXISTS triggers
                 (
                     id              INTEGER PRIMARY KEY,
-                    discord_user_id STRING NOT NULL,
+                    discord_user_id INTEGER NOT NULL,
                     trigger         STRING NOT NULL,
                     case_sensitive  BOOLEAN DEFAULT FALSE,
                     regex           BOOLEAN DEFAULT FALSE

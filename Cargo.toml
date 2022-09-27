@@ -17,6 +17,9 @@ rand = "0.8"
 #tikv-client = "0.1"
 async-trait = "0.1"
 regex = "1"
+thiserror = "1"
+chrono = "0.4"
+ahash = "0.8"
 
 sqlx = { version = "0.6", features = [ "runtime-tokio-rustls", "sqlite" ] }
 
