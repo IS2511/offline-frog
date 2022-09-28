@@ -19,7 +19,8 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
                 (
                     id              INTEGER PRIMARY KEY,
                     discord_user_id INTEGER NOT NULL,
-                    channel         STRING NOT NULL
+                    channel         STRING NOT NULL,
+                    UNIQUE(discord_user_id, channel) ON CONFLICT FAIL
                 )
             "#).execute(&pool).await?;
 
@@ -30,7 +31,8 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
                     discord_user_id INTEGER NOT NULL,
                     trigger         STRING NOT NULL,
                     case_sensitive  BOOLEAN DEFAULT FALSE,
-                    regex           BOOLEAN DEFAULT FALSE
+                    regex           BOOLEAN DEFAULT FALSE,
+                    UNIQUE(discord_user_id, trigger, regex) ON CONFLICT FAIL
                 )
             "#).execute(&pool).await?;
 

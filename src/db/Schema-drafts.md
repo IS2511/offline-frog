@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS channels
 (
     id              INTEGER PRIMARY KEY,
     discord_user_id INTEGER NOT NULL,
-    channel         STRING NOT NULL
+    channel         STRING NOT NULL,
+    UNIQUE(discord_user_id, channel) ON CONFLICT FAIL
 );
 
 CREATE TABLE IF NOT EXISTS triggers
@@ -14,8 +15,12 @@ CREATE TABLE IF NOT EXISTS triggers
     discord_user_id INTEGER NOT NULL,
     trigger         STRING NOT NULL,
     case_sensitive  BOOLEAN DEFAULT FALSE,
-    regex           BOOLEAN DEFAULT FALSE
+    regex           BOOLEAN DEFAULT FALSE,
+    UNIQUE(discord_user_id, trigger, regex) ON CONFLICT FAIL
 );
+
+-- DROP TABLE IF EXISTS channels;
+-- DROP TABLE IF EXISTS triggers;
 
 -- DELETE FROM channels;
 -- DELETE FROM triggers;
