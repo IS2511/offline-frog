@@ -1,4 +1,3 @@
-use std::fmt::format;
 use irc::client::prelude::*;
 use futures_util::{StreamExt};
 use sqlx::{Executor, Row};
