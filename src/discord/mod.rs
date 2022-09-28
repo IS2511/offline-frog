@@ -44,8 +44,13 @@ struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("`{}` connected!", ready.user.tag());
+        
+        let prefix = {
+            let data = ctx.data.read().await;
+            data.get::<CommandPrefix>().unwrap().clone()
+        };
 
-        ctx.set_activity(Activity::playing("DM frog!help")).await;
+        ctx.set_activity(Activity::playing(format!("DM {}help", prefix))).await;
     }
 }
 
