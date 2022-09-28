@@ -20,9 +20,10 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
 
-    let data = ctx.data.read().await;
-    let prefix = "".to_string();
-    let prefix = data.get::<CommandPrefix>().unwrap_or(&prefix).clone();
+    let prefix = {
+        let data = ctx.data.read().await;
+        data.get::<CommandPrefix>().unwrap().clone()
+    };
 
     macro_rules! cmd {
         ($com:expr, $des:expr) => {
