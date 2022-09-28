@@ -38,11 +38,6 @@ impl TypeMapKey for CommandPrefix {
     type Value = String;
 }
 
-// struct KvStorageTMK;
-// impl TypeMapKey for KvStorageTMK {
-//     type Value = Arc<KvStorage>;
-// }
-
 struct Handler;
 
 #[async_trait]
@@ -96,7 +91,7 @@ pub async fn notify_user(cache_and_http: Arc<CacheAndHttp>, event: TriggerEvent)
             m.embed(|e|
                 e.description(event.message.message_highlighted("**"))
                     .author(|a|
-                        a.name(format!("{}  #{}", event.message.author, event.message.channel))
+                        a.name(format!("{} ➡ #{}", event.message.author, event.message.channel))
                             .url(format!("https://twitch.tv/{}", event.message.channel))
                     )
                     // .footer(|f|
