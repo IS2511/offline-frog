@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 dotenv = "0.15"
-clap = "4.0.0-rc.2"
+clap = { version = "4.0.0-rc.3", features = ["derive"] }
 serenity = "0.11"
 tokio = { version = "1.21", features = ["macros", "rt-multi-thread"] }
 irc = "0.15"
