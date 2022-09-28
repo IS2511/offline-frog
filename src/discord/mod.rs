@@ -38,6 +38,11 @@ impl TypeMapKey for CommandPrefix {
     type Value = String;
 }
 
+struct DbConnection;
+impl TypeMapKey for DbConnection {
+    type Value = Mutex<sqlx::pool::PoolConnection<sqlx::Sqlite>>;
+}
+
 struct Handler;
 
 #[async_trait]
@@ -82,6 +87,7 @@ pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>) -> Cl
         .expect("Error creating client");
 
     d_client.data.write().await.insert::<CommandPrefix>(prefix.clone());
+    d_client.data.write().await.insert::<DbConnection>(Mutex::new(db_con));
 
     d_client
 }
