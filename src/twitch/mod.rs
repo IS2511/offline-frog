@@ -1,3 +1,4 @@
+use std::fmt::format;
 use irc::client::prelude::*;
 use futures_util::{StreamExt};
 use sqlx::{Executor, Row};
@@ -149,8 +150,18 @@ pub async fn start_client(mut db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, 
                     irc_debug!("Got trigger: `{}` discord {}", trigger, discord_id);
 
                     if regex {
-                        irc_debug!("Not yet implemented regex! trigger: {}", trigger);
-                        // TODO: Regex triggers
+                        // TODO: Make sure regex in DB is valid (check when putting in)
+                        if case_sensitive {
+                            let re = regex::Regex::new(format!("(?i){}", trigger).as_str()).unwrap();
+                            for mat in re.find_iter(msg) {
+                                append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
+                            }
+                        } else {
+                            let re = regex::Regex::new(&trigger).unwrap();
+                            for mat in re.find_iter(msg) {
+                                append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
+                            }
+                        }
                     } else {
                         if case_sensitive {
                             if let Some(pos) = msg.find(&trigger) {
