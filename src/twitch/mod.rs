@@ -130,17 +130,11 @@ pub async fn start_client(mut db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, 
 
 
                 let query = sqlx::query("SELECT discord_user_id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id IN (SELECT discord_user_id FROM channels WHERE channel = ?)")
-                    // .bind(format!("'{}'", channel_name));
                     .bind(channel_name);
-                    // ;
 
                 let mut triggers = db_con.fetch(query);
-                // let triggers = db_con.fetch_all(query).await?;
-
-                // irc_debug!("Got {} rows", triggers.len());
 
                 for row in triggers.next().await {
-                // for row in triggers {
                     if row.is_err() {
                         irc_debug!("SQL error");
                         continue;
