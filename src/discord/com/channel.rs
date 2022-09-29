@@ -51,25 +51,25 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
             match args.action {
                 Actions::Add { channels } => {
                     let mut tx = db_con.begin().await?;
-                    for channel in channels {
+                    for channel in &channels {
                         let res = sqlx::query("INSERT OR IGNORE INTO channels (discord_user_id, channel) VALUES (?, ?)")
                             .bind(msg.author.id.0 as i64)
-                            .bind(&channel)
+                            .bind(channel)
                             .execute(&mut tx).await;
                         if let Err(e) = res {
                             match e {
                                 sqlx::Error::Database(e) => {
                                     let code = e.code().unwrap_or(Cow::Borrowed(""));
                                     if code == "2067" { // SQLITE_CONSTRAINT_UNIQUE (UNIQUE constraint failed)
-                                        msg.reply(ctx, format!("Channel {} is already in the list", &channel)).await?;
+                                        msg.reply(ctx, format!("Channel {} is already in the list", channel)).await?;
                                     } else {
                                         // msg.reply(ctx, format!("Error adding channel #{}: {}", channel, e.message())).await?;
-                                        msg.reply(ctx, format!("Error adding channel #{}", &channel)).await?;
+                                        msg.reply(ctx, format!("Error adding channel #{}", channel)).await?;
                                     }
                                 },
                                 _ => {
                                     // msg.reply(ctx, format!("Error adding channel {}: {:?}", &channel, e)).await?;
-                                    msg.reply(ctx, format!("Error adding channel #{}", &channel)).await?;
+                                    msg.reply(ctx, format!("Error adding channel #{}", channel)).await?;
                                 }
                             }
                         }
@@ -82,17 +82,17 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                 },
                 Actions::Remove { channels } => {
                     let mut tx = db_con.begin().await?;
-                    for channel in channels {
+                    for channel in &channels {
                         let res = sqlx::query("DELETE FROM channels WHERE discord_user_id = ? AND channel = ?")
                             .bind(msg.author.id.0 as i64)
-                            .bind(&channel)
+                            .bind(channel)
                             .execute(&mut tx).await;
                         if let Err(e) = res {
                             // msg.reply(ctx, format!("Error removing channel #{}", &channel)).await?;
                             match e {
                                 sqlx::Error::Database(e) => {
                                     let code = e.code().unwrap_or(Cow::Borrowed(""));
-                                    msg.reply(ctx, format!("Error removing channel #{}: `{}`", &channel, code)).await?;
+                                    msg.reply(ctx, format!("Error removing channel #{}: `{}`", channel, code)).await?;
                                     // if code == "2067" { // SQLITE_CONSTRAINT_UNIQUE (UNIQUE constraint failed)
                                     //     msg.reply(ctx, format!("Channel {} is not in the list", &channel)).await?;
                                     // } else {
@@ -102,7 +102,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                                 },
                                 _ => {
                                     // msg.reply(ctx, format!("Error removing channel {}: {:?}", &channel, e)).await?;
-                                    msg.reply(ctx, format!("Error removing channel #{}", &channel)).await?;
+                                    msg.reply(ctx, format!("Error removing channel #{}", channel)).await?;
                                 }
                             }
                         }
