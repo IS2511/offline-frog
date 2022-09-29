@@ -9,6 +9,7 @@ use serenity::model::prelude::*;
 use serenity::model::id::UserId;
 use serenity::framework::standard::{StandardFramework};
 use serenity::http::CacheHttp;
+use crate::ChannelJoinPartEvent;
 
 use crate::twitch::TwitchMessageSimple;
 
@@ -44,6 +45,11 @@ impl TypeMapKey for DbConnection {
     type Value = Mutex<sqlx::pool::PoolConnection<sqlx::Sqlite>>;
 }
 
+struct IrcEventSender;
+impl TypeMapKey for IrcEventSender {
+    type Value = tokio::sync::mpsc::Sender<ChannelJoinPartEvent>;
+}
+
 struct Handler;
 
 #[async_trait]
@@ -60,7 +66,7 @@ impl EventHandler for Handler {
     }
 }
 
-pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>) -> Client {
+pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, irc_tx: tokio::sync::mpsc::Sender<ChannelJoinPartEvent>) -> Client {
     let prefix = env::var("DISCORD_PREFIX").unwrap_or_else(|_| "frog!".to_string());
 
     // Configure discord bot
@@ -89,6 +95,7 @@ pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>) -> Cl
 
     d_client.data.write().await.insert::<CommandPrefix>(prefix.clone());
     d_client.data.write().await.insert::<DbConnection>(Mutex::new(db_con));
+    d_client.data.write().await.insert::<IrcEventSender>(irc_tx);
 
     d_client
 }

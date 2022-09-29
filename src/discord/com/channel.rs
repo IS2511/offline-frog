@@ -6,8 +6,9 @@ use serenity::framework::standard::macros::{command, group};
 
 use clap::{Parser, Subcommand};
 use sqlx::{Acquire, Row};
+use crate::ChannelJoinPartEvent;
 
-use crate::discord::{CommandPrefix, DbConnection, styled_str};
+use crate::discord::{CommandPrefix, DbConnection, IrcEventSender, styled_str};
 use crate::discord::com::{get_bot_prefix, get_db};
 
 /// Arguments to the channel command
@@ -80,6 +81,10 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         Err(e) => { msg.reply(ctx, format!("Error adding channels: {:?}", e)).await?; },
                      }
 
+                    let irc_tx = {
+                        let data = ctx.data.read().await;
+                        data.get::<IrcEventSender>().unwrap().clone()
+                    };
                     for channel in &channels {
                         let res = sqlx::query("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?)")
                             .bind(channel)
@@ -87,7 +92,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         let exists: bool = res.get(0);
                         if !exists {
                             // msg.reply(ctx, format!("*Fun fact*: Channel #{} wasn't tracked by this bot before, but now is!", channel)).await?;
-                            // TODO: Send a request to join that channel
+                            irc_tx.send(ChannelJoinPartEvent::Join(channel.clone())).await?;
                         }
                     }
                 },
@@ -124,6 +129,10 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         Err(e) => { msg.reply(ctx, format!("Error removing channels: {:?}", e)).await?; },
                     }
 
+                    let irc_tx = {
+                        let data = ctx.data.read().await;
+                        data.get::<IrcEventSender>().unwrap().clone()
+                    };
                     for channel in &channels {
                         let res = sqlx::query("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?)")
                             .bind(channel)
@@ -131,7 +140,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         let exists: bool = res.get(0);
                         if !exists {
                             // msg.reply(ctx, format!("*Fun fact*: Channel #{} no longer needs tracking from this bot!", channel)).await?;
-                            // TODO: Send a request to leave that channel
+                            irc_tx.send(ChannelJoinPartEvent::Part(channel.clone())).await?;
                         }
                     }
                 },
