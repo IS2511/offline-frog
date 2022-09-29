@@ -41,4 +41,8 @@ SELECT trigger, case_sensitive, regex FROM triggers WHERE discord_user_id = 2065
 
 SELECT discord_user_id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id IN (SELECT discord_user_id FROM channels WHERE channel = 'weest');
 
+SELECT id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id = 206528846026113024;
+
+SELECT EXISTS(SELECT 1 FROM channels WHERE channel = 'weest');
+
 ```
