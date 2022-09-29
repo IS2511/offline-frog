@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use dotenv::dotenv;
 use tokio::sync::mpsc;
 
@@ -6,6 +7,7 @@ mod twitch;
 mod db;
 
 use discord::TriggerEvent;
+use crate::twitch::ChannelJoinPartEvent;
 
 #[tokio::main]
 async fn main() {
@@ -18,11 +20,12 @@ async fn main() {
     let twitch_db_con = db_pool.acquire()
         .await.expect("Failed to acquire database connection");
 
-    let (discord_tx, mut discord_rx) = mpsc::channel::<TriggerEvent>(1_000);
+    let (discord_tx, mut discord_rx) = mpsc::channel::<TriggerEvent>(10_000);
+    let (irc_tx, mut irc_rx) = mpsc::channel::<ChannelJoinPartEvent>(1_000);
 
     // Run discord bot
     let discord_handle = tokio::spawn(async move {
-        let mut client = discord::make_client(discord_db_con).await;
+        let mut client = discord::make_client(discord_db_con, irc_tx).await;
 
         let cache_and_http = client.cache_and_http.clone();
 
@@ -44,7 +47,30 @@ async fn main() {
 
     // Run twitch listener
     let twitch_handle = tokio::spawn(async move {
-        twitch::start(twitch_db_con, discord_tx).await
+        let mut client = twitch::make_client(twitch_db_con, discord_tx).await.expect("Failed to make twitch client");
+        let mut client = Arc::new(tokio::sync::RwLock::new(client));
+        let client_clone = client.clone();
+
+        let irc_sender_thread = tokio::spawn(async move {
+            while let Some(event) = irc_rx.recv().await {
+                match event {
+                    // TODO: Handle join/part errors
+                    ChannelJoinPartEvent::Join(channel) => {
+                        println!("[IRC] Joining channel #{}...", channel);
+                        client_clone.read().await.join_channel(&channel).await;
+                    },
+                    ChannelJoinPartEvent::Part(channel) => {
+                        println!("[IRC] Parting channel #{}...", channel);
+                        client_clone.read().await.part_channel(&channel).await;
+                    },
+                }
+            }
+        });
+
+        if let Err(why) = client.write().await.start().await {
+            println!("[IRC] An error occurred while running the client: {:?}", why);
+        }
+        irc_sender_thread.await.expect("Failed to join irc_sender_thread");
     });
 
     discord_handle.await.expect("Discord thread panicked");
