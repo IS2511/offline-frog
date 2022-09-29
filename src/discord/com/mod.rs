@@ -12,7 +12,7 @@ macro_rules! get_db {
     ($ctx:expr, $var:ident) => {
         let mut $var = $ctx.data.write().await;
         let $var = $var.get_mut::<DbConnection>().unwrap();
-        let mut $var = $var.get_mut();
+        let $var = $var.get_mut();
     };
 }
 pub(crate) use get_db;
