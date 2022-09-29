@@ -79,6 +79,17 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                          // TODO: Make so no data leaks through the error message
                         Err(e) => { msg.reply(ctx, format!("Error adding channels: {:?}", e)).await?; },
                      }
+
+                    for channel in &channels {
+                        let res = sqlx::query("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?)")
+                            .bind(channel)
+                            .fetch_one(&mut *db_con).await?;
+                        let exists: bool = res.get(0);
+                        if !exists {
+                            // msg.reply(ctx, format!("*Fun fact*: Channel #{} wasn't tracked by this bot before, but now is!", channel)).await?;
+                            // TODO: Send a request to join that channel
+                        }
+                    }
                 },
                 Actions::Remove { channels } => {
                     let mut tx = db_con.begin().await?;
@@ -111,6 +122,17 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         Ok(_) => { msg.reply(ctx, "Removed channels").await?; },
                         // TODO: Make so no data leaks through the error message
                         Err(e) => { msg.reply(ctx, format!("Error removing channels: {:?}", e)).await?; },
+                    }
+
+                    for channel in &channels {
+                        let res = sqlx::query("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?)")
+                            .bind(channel)
+                            .fetch_one(&mut *db_con).await?;
+                        let exists: bool = res.get(0);
+                        if !exists {
+                            // msg.reply(ctx, format!("*Fun fact*: Channel #{} no longer needs tracking from this bot!", channel)).await?;
+                            // TODO: Send a request to leave that channel
+                        }
                     }
                 },
                 Actions::List => {
