@@ -24,7 +24,7 @@ enum Actions {
         /// Channels to add
         channels: Vec<String>,
     },
-    /// Remove a channel from the list of monitored channels
+    /// Remove channels from the list of monitored channels
     Remove {
         /// Channel to remove
         channels: Vec<String>,
