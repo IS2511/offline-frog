@@ -7,7 +7,7 @@ use serenity::framework::standard::macros::{command, group};
 use clap::{Parser, Subcommand};
 use sqlx::{Acquire, Row};
 
-use crate::discord::{CommandPrefix, DbConnection};
+use crate::discord::{CommandPrefix, DbConnection, styled_str};
 
 /// Arguments to the channel command
 #[derive(clap::Parser, Debug)]
@@ -141,7 +141,8 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
             }
         },
         Err(e) => {
-            msg.reply(ctx, format!("Error parsing command: {}", e)).await?;
+            // msg.reply(ctx, format!("Error parsing command: {}", e)).await?;
+            msg.reply(ctx, styled_str::fmt_args_error(&e)).await?;
         }
     }
 

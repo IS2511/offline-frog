@@ -13,6 +13,10 @@ use serenity::http::CacheHttp;
 use crate::twitch::TwitchMessageSimple;
 
 
+mod com;
+mod styled_str;
+
+
 #[derive(Debug)]
 pub struct TriggerEvent {
     pub receiver: u64,
@@ -29,9 +33,6 @@ impl TriggerEvent {
         }
     }
 }
-
-
-mod com;
 
 struct CommandPrefix;
 impl TypeMapKey for CommandPrefix {
