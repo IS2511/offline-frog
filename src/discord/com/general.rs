@@ -3,6 +3,8 @@ use serenity::model::prelude::*;
 use serenity::framework::standard::CommandResult;
 use serenity::framework::standard::macros::{command, group};
 
+use crate::discord::com::get_bot_prefix;
+
 use crate::discord::CommandPrefix;
 
 #[group]
@@ -20,10 +22,7 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
 
-    let prefix = {
-        let data = ctx.data.read().await;
-        data.get::<CommandPrefix>().unwrap().clone()
-    };
+    let prefix = get_bot_prefix!(ctx);
 
     macro_rules! cmd {
         ($com:expr, $des:expr) => {

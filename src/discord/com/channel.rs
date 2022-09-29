@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use sqlx::{Acquire, Row};
 
 use crate::discord::{CommandPrefix, DbConnection, styled_str};
+use crate::discord::com::{get_bot_prefix, get_db};
 
 /// Arguments to the channel command
 #[derive(clap::Parser, Debug)]
@@ -39,16 +40,11 @@ struct Channel;
 
 #[command]
 async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
-    let prefix = {
-        let data = ctx.data.read().await;
-        data.get::<CommandPrefix>().unwrap().clone()
-    };
+    let prefix = get_bot_prefix!(ctx);
 
     let args = Args::try_parse_from(msg.content.trim_start_matches(&prefix).split_whitespace());
 
-    let mut db_con = ctx.data.write().await;
-    let db_con = db_con.get_mut::<DbConnection>().unwrap();
-    let db_con = db_con.get_mut();
+    get_db!(ctx, db_con);
 
     match args {
         Ok(args) => {
