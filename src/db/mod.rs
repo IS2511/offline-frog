@@ -17,9 +17,9 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
     sqlx::query(
         r#"CREATE TABLE IF NOT EXISTS channels
                 (
-                    id              INTEGER PRIMARY KEY,
+                    id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                     discord_user_id INTEGER NOT NULL,
-                    channel         STRING NOT NULL,
+                    channel         TEXT NOT NULL,
                     UNIQUE(discord_user_id, channel) ON CONFLICT FAIL
                 )
             "#).execute(&pool).await?;
@@ -27,11 +27,11 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
     sqlx::query(
         r#"CREATE TABLE IF NOT EXISTS triggers
                 (
-                    id              INTEGER PRIMARY KEY,
+                    id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                     discord_user_id INTEGER NOT NULL,
-                    trigger         STRING NOT NULL,
-                    case_sensitive  BOOLEAN DEFAULT FALSE,
-                    regex           BOOLEAN DEFAULT FALSE,
+                    trigger         TEXT NOT NULL,
+                    case_sensitive  BOOLEAN DEFAULT FALSE NOT NULL,
+                    regex           BOOLEAN DEFAULT FALSE NOT NULL,
                     UNIQUE(discord_user_id, trigger, regex) ON CONFLICT FAIL
                 )
             "#).execute(&pool).await?;
