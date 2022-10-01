@@ -167,9 +167,14 @@ impl TwitchClient {
 
                     let mut triggers = self.db_con.get_mut().fetch(query);
 
-                    for row in triggers.next().await {
-                        if row.is_err() {
-                            irc_debug!("SQL error");
+                    // TODO: Figure this out, "for" eats the boxing I think
+                    for row in triggers.next().await.transpose() {
+                        // if row.is_err() {
+                        //     irc_debug!("SQL error");
+                        //     continue;
+                        // }
+                        if row.is_none() {
+                            irc_debug!("SQL returned None");
                             continue;
                         }
                         let row = row.unwrap();
