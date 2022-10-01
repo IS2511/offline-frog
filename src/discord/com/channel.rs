@@ -47,15 +47,17 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
 
     get_db!(ctx, db_con);
 
+    let author_id = msg.author.id.0 as i64;
+
     match args {
         Ok(args) => {
             match args.action {
                 Actions::Add { channels } => {
                     let mut tx = db_con.begin().await?;
                     for channel in &channels {
-                        let res = sqlx::query("INSERT OR IGNORE INTO channels (discord_user_id, channel) VALUES (?, ?)")
-                            .bind(msg.author.id.0 as i64)
-                            .bind(channel)
+                        let res = sqlx::query!("INSERT OR IGNORE INTO channels (discord_user_id, channel) VALUES (?, ?)",
+                            author_id,
+                            channel)
                             .execute(&mut tx).await;
                         if let Err(e) = res {
                             match e {
@@ -86,10 +88,9 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         data.get::<IrcEventSender>().unwrap().clone()
                     };
                     for channel in &channels {
-                        let res = sqlx::query("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?)")
-                            .bind(channel)
+                        let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
                             .fetch_one(&mut *db_con).await?;
-                        let exists: bool = res.get(0);
+                        let exists: bool = res.result == 1;
                         if !exists {
                             // msg.reply(ctx, format!("*Fun fact*: Channel #{} wasn't tracked by this bot before, but now is!", channel)).await?;
                             irc_tx.send(ChannelJoinPartEvent::Join(channel.clone())).await?;
@@ -99,9 +100,9 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                 Actions::Remove { channels } => {
                     let mut tx = db_con.begin().await?;
                     for channel in &channels {
-                        let res = sqlx::query("DELETE FROM channels WHERE discord_user_id = ? AND channel = ?")
-                            .bind(msg.author.id.0 as i64)
-                            .bind(channel)
+                        let res = sqlx::query!("DELETE FROM channels WHERE discord_user_id = ? AND channel = ?",
+                            author_id,
+                            channel)
                             .execute(&mut tx).await;
                         if let Err(e) = res {
                             // msg.reply(ctx, format!("Error removing channel #{}", &channel)).await?;
@@ -134,10 +135,9 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         data.get::<IrcEventSender>().unwrap().clone()
                     };
                     for channel in &channels {
-                        let res = sqlx::query("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?)")
-                            .bind(channel)
+                        let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
                             .fetch_one(&mut *db_con).await?;
-                        let exists: bool = res.get(0);
+                        let exists: bool = res.result == 1;
                         if !exists {
                             // msg.reply(ctx, format!("*Fun fact*: Channel #{} no longer needs tracking from this bot!", channel)).await?;
                             irc_tx.send(ChannelJoinPartEvent::Part(channel.clone())).await?;
@@ -145,14 +145,12 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                     }
                 },
                 Actions::List => {
-                    let rows = sqlx::query("SELECT channel FROM channels WHERE discord_user_id = ?")
-                        .bind(msg.author.id.0 as i64)
+                    let rows = sqlx::query!("SELECT channel FROM channels WHERE discord_user_id = ?",
+                        author_id)
                         .fetch_all(db_con).await?;
 
                     let mut channels = rows.iter().map(|row|
-                        format!("#{}", row.try_get::<String, &str>("channel")
-                            .expect("SQL query returned invalid data")
-                        )
+                        format!("#{}", row.channel)
                     ).collect::<Vec<_>>();
                     channels.sort();
 

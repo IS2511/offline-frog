@@ -1,20 +1,28 @@
+use std::env;
 // use sqlx::prelude::*;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};
 
+
+pub struct TriggerRecord {
+    pub id: i64,
+    pub trigger: String,
+    pub case_sensitive: bool,
+    pub regex: bool,
+}
 
 pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
 
     let pool = SqlitePoolOptions::new()
         .min_connections(2)
         .max_connections(3)
-        .connect("sqlite:local.sqlite?mode=rwc")
+        .connect(&env::var("DATABASE_URL").expect("DATABASE_URL must be set"))
         .await
         .expect("Failed to connect to database");
 
     let tx = pool.begin().await?;
 
-    sqlx::query(
+    sqlx::query!(
         r#"CREATE TABLE IF NOT EXISTS channels
                 (
                     id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +32,7 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
                 )
             "#).execute(&pool).await?;
 
-    sqlx::query(
+    sqlx::query!(
         r#"CREATE TABLE IF NOT EXISTS triggers
                 (
                     id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,

@@ -55,16 +55,18 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
 
     get_db!(ctx, db_con);
 
+    let author_id = msg.author.id.0 as i64;
+
     match args {
         Ok(args) => {
             match args.action {
                 Actions::Add { trigger, case_sensitive, regex } => {
                     let mut tx = db_con.begin().await?;
-                    let res = sqlx::query("INSERT INTO triggers (discord_user_id, trigger, case_sensitive, regex) VALUES (?, ?, ?, ?)")
-                        .bind(msg.author.id.0 as i64)
-                        .bind(&trigger)
-                        .bind(case_sensitive)
-                        .bind(regex)
+                    let res = sqlx::query!("INSERT INTO triggers (discord_user_id, trigger, case_sensitive, regex) VALUES (?, ?, ?, ?)",
+                        author_id,
+                        trigger,
+                        case_sensitive,
+                        regex)
                         .execute(&mut tx)
                         .await;
                     if let Err(e) = res {
@@ -91,9 +93,9 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                     let mut tx = db_con.begin().await?;
                     let mut failed_list = Vec::new();
                     for id in &ids {
-                        let res = sqlx::query("DELETE FROM triggers WHERE discord_user_id = ? AND id = ?")
-                            .bind(msg.author.id.0 as i64)
-                            .bind(id)
+                        let res = sqlx::query!("DELETE FROM triggers WHERE discord_user_id = ? AND id = ?",
+                            author_id,
+                            id)
                             .execute(&mut tx)
                             .await;
                         if let Err(e) = res {
@@ -110,8 +112,8 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                     }
                 },
                 Actions::List => {
-                    let res = sqlx::query("SELECT id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id = ?")
-                        .bind(msg.author.id.0 as i64)
+                    let res = sqlx::query_as!(crate::db::TriggerRecord, "SELECT id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id = ?",
+                        author_id)
                         .fetch_all(db_con)
                         .await;
                     if let Err(e) = res {
@@ -121,12 +123,8 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                     let res = res.unwrap();
                     let mut reply = String::new();
                     for row in res {
-                        let id: i64 = row.get(0);
-                        let trigger: String = row.get(1);
-                        let case_sensitive: bool = row.get(2);
-                        let regex: bool = row.get(3);
                         // TODO: Escape discord styling in `trigger` before printing
-                        reply.push_str(&format!("**{}**: `{}` (case_sensitive: {}, regex: {})\n", id, trigger, case_sensitive, regex));
+                        reply.push_str(&format!("**{}**: `{}` (case_sensitive: {}, regex: {})\n", row.id, row.trigger, row.case_sensitive, row.regex));
                     }
                     msg.channel_id.send_message(ctx, |m|
                         m.embed(|e|

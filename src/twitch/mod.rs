@@ -162,8 +162,8 @@ impl TwitchClient {
                 }
 
 
-                    let query = sqlx::query("SELECT discord_user_id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id IN (SELECT discord_user_id FROM channels WHERE channel = ?)")
-                        .bind(channel_name);
+                    let query = sqlx::query!("SELECT discord_user_id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id IN (SELECT discord_user_id FROM channels WHERE channel = ?)",
+                        channel_name);
 
                     let mut triggers = self.db_con.get_mut().fetch(query);
 
