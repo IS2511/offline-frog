@@ -98,7 +98,7 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                             id)
                             .execute(&mut tx)
                             .await;
-                        if let Err(e) = res {
+                        if res.is_err() {
                             failed_list.push(id.to_string());
                         }
                     }
@@ -116,8 +116,8 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                         author_id)
                         .fetch_all(db_con)
                         .await;
-                    if let Err(e) = res {
-                        msg.reply(ctx, format!("Failed to list triggers")).await?;
+                    if res.is_err() {
+                        msg.reply(ctx, "Failed to list triggers".to_string()).await?;
                         return Ok(());
                     }
                     let res = res.unwrap();
