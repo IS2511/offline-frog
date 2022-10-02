@@ -49,8 +49,8 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
                 ("General",
                  cmd_list!(
                      cmd!("ping", "Pong!"),
-                     cmd!("help", "Print this help message"),
-                     cmd!("about", "About this bot")
+                     cmd!("help", "Print this help message")
+                     // cmd!("about", "About this bot")
                  ), false),
                 ("Channel", cmd_list!(
                      cmd!("channel add <channels>", "Add channels to watchlist"),
