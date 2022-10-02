@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use ahash::AHashSet;
 use serenity::prelude::*;
 use serenity::model::prelude::*;
 use serenity::framework::standard::CommandResult;
@@ -6,10 +7,10 @@ use serenity::framework::standard::macros::{command, group};
 
 use clap::{Parser, Subcommand};
 use sqlx::{Acquire};
-use crate::ChannelJoinPartEvent;
 
 use crate::discord::{CommandPrefix, DbConnection, IrcEventSender, styled_str};
 use crate::discord::com::{get_bot_prefix, get_db};
+use crate::twitch::{make_join_msg, make_part_msg};
 
 /// Arguments to the channel command
 #[derive(clap::Parser, Debug)]
@@ -45,6 +46,11 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
 
     let args = Args::try_parse_from(msg.content.trim_start_matches(&prefix).split_whitespace());
 
+    let irc_tx = {
+        let data = ctx.data.read().await;
+        data.get::<IrcEventSender>().unwrap().clone()
+    };
+
     get_db!(ctx, db_con);
 
     let author_id = msg.author.id.0 as i64;
@@ -53,6 +59,18 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
         Ok(args) => {
             match args.action {
                 Actions::Add { channels } => {
+                    let mut to_be_joined = AHashSet::new();
+                    for channel in &channels {
+                        let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
+                            .fetch_one(&mut *db_con).await?;
+                        let exists: bool = res.result == 1;
+                        // println!("ADD Channel #{} exists: {}", channel, exists);
+                        if !exists {
+                            to_be_joined.insert(channel);
+                        }
+                    }
+                    // println!("ADD Channels to be joined: {:?}", to_be_joined);
+
                     let mut tx = db_con.begin().await?;
                     for channel in &channels {
                         let res = sqlx::query!("INSERT OR IGNORE INTO channels (discord_user_id, channel) VALUES (?, ?)",
@@ -60,6 +78,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                             channel)
                             .execute(&mut tx).await;
                         if let Err(e) = res {
+                            to_be_joined.remove(channel);
                             match e {
                                 sqlx::Error::Database(e) => {
                                     let code = e.code().unwrap_or(Cow::Borrowed(""));
@@ -77,24 +96,16 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                             }
                         }
                     }
-                     match tx.commit().await {
+                    match tx.commit().await {
                         Ok(_) => { msg.reply(ctx, "Added channels").await?; },
-                         // TODO: Make so no data leaks through the error message
+                        // TODO: Make so no data leaks through the error message
                         Err(e) => { msg.reply(ctx, format!("Error adding channels: {:?}", e)).await?; },
-                     }
+                    }
 
-                    let irc_tx = {
-                        let data = ctx.data.read().await;
-                        data.get::<IrcEventSender>().unwrap().clone()
-                    };
-                    for channel in &channels {
-                        let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
-                            .fetch_one(&mut *db_con).await?;
-                        let exists: bool = res.result == 1;
-                        if !exists {
-                            // msg.reply(ctx, format!("*Fun fact*: Channel #{} wasn't tracked by this bot before, but now is!", channel)).await?;
-                            irc_tx.send(ChannelJoinPartEvent::Join(channel.clone())).await?;
-                        }
+                    // println!("ADD Channels to be actually joined: {:?}", to_be_joined);
+                    for channel in to_be_joined {
+                        // msg.reply(ctx, format!("*Fun fact*: Channel #{} wasn't tracked by this bot before, but now is!", channel)).await?;
+                        irc_tx.send(make_join_msg(channel.clone())).await?;
                     }
                 },
                 Actions::Remove { channels } => {
@@ -130,17 +141,14 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         Err(e) => { msg.reply(ctx, format!("Error removing channels: {:?}", e)).await?; },
                     }
 
-                    let irc_tx = {
-                        let data = ctx.data.read().await;
-                        data.get::<IrcEventSender>().unwrap().clone()
-                    };
                     for channel in &channels {
                         let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
                             .fetch_one(&mut *db_con).await?;
                         let exists: bool = res.result == 1;
+                        // println!("REMOVE Channel #{} exists: {}", channel, exists);
                         if !exists {
                             // msg.reply(ctx, format!("*Fun fact*: Channel #{} no longer needs tracking from this bot!", channel)).await?;
-                            irc_tx.send(ChannelJoinPartEvent::Part(channel.clone())).await?;
+                            irc_tx.send(make_part_msg(channel.clone())).await?;
                         }
                     }
                 },

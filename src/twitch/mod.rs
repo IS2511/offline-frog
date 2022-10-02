@@ -1,16 +1,25 @@
 use irc::client::prelude::*;
-use futures_util::{StreamExt};
 use thiserror::Error;
 use ahash::AHashMap;
+use irc::client::ClientStream;
 
 use crate::TriggerEvent;
 
 
 
 #[derive(Debug)]
-pub enum ChannelJoinPartEvent {
-    Join(String),
-    Part(String),
+pub enum IrcMessageEvent {
+    Incoming(Message),
+    Outgoing(Command),
+}
+
+pub fn make_join_msg(channel: String) -> IrcMessageEvent {
+    // IrcMessageEvent::Outgoing(Message::from(Command::JOIN(channel, None, None)))
+    IrcMessageEvent::Outgoing(Command::JOIN(format!("#{}", channel), None, None))
+}
+
+pub fn make_part_msg(channel: String) -> IrcMessageEvent {
+    IrcMessageEvent::Outgoing(Command::PART(format!("#{}", channel), None))
 }
 
 
@@ -31,10 +40,6 @@ impl TwitchMessageSimple {
             triggers: Vec::new(),
         }
     }
-
-    // pub fn add_trigger_at(&mut self, start: u16, end: u16) {
-    //     self.triggers.push((start, end));
-    // }
 
     pub fn add_trigger(&mut self, trig: (u16, u16)) {
         self.triggers.push(trig);
@@ -106,48 +111,42 @@ pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, tx: t
 
 impl TwitchClient {
 
-    pub async fn join_channel(&self, channel: &str) -> Result<(), irc::error::Error> {
-        self.client.send(Command::JOIN(channel.to_string(), None, None))?;
-        Ok(())
+    pub fn send(&self, message: impl Into<Message>) -> Result<(), irc::error::Error> {
+        self.client.send(message)
     }
 
-    pub async fn part_channel(&self, channel: &str) -> Result<(), irc::error::Error> {
-        self.client.send(Command::PART(channel.to_string(), None))?;
-        Ok(())
+    pub fn stream(&mut self) -> Result<ClientStream, irc::error::Error> {
+        self.client.stream()
     }
 
-    pub async fn start(&mut self) -> Result<(), IrcThreadError> {
-        
-        let mut stream = self.client.stream()?;
+    pub async fn handle(&mut self, message: &Message) -> Result<(), IrcThreadError> {
+        let author_nickname = message.source_nickname().unwrap_or("");
 
-        while let Some(message) = stream.next().await.transpose()? {
-            let author_nickname = message.source_nickname().unwrap_or("");
+        macro_rules! irc_debug {
+                ($format:expr, $($arg:expr),+) => {
+                    println!("[IRC] {}", format!($format, $($arg),+));
+                };
+                ($format:expr) => {
+                    println!("[IRC] {}", $format);
+                };
+            }
 
-            macro_rules! irc_debug {
-            ($format:expr, $($arg:expr),+) => {
-                println!("[IRC] {}", format!($format, $($arg),+));
-            };
-            ($format:expr) => {
-                println!("[IRC] {}", $format);
-            };
-        }
+        match message.command {
+            Command::PRIVMSG(ref target, ref msg) => {
+                irc_debug!("{} says to {}: {}", author_nickname, target, msg);
 
-            match message.command {
-                Command::PRIVMSG(ref target, ref msg) => {
-                    irc_debug!("{} says to {}: {}", author_nickname, target, msg);
+                let channel_name = target.strip_prefix('#').unwrap_or(target).to_lowercase();
 
-                    let channel_name = target.strip_prefix('#').unwrap_or(target).to_lowercase();
+                let msg_template = TwitchMessageSimple::new(
+                    channel_name.clone(),
+                    author_nickname.to_string(),
+                    msg.to_string()
+                );
+                // irc_debug!("msg_template: {:?}", msg_template);
 
-                    let msg_template = TwitchMessageSimple::new(
-                        channel_name.clone(),
-                        author_nickname.to_string(),
-                        msg.to_string()
-                    );
-                    // irc_debug!("msg_template: {:?}", msg_template);
+                let mut messages_per_user = AHashMap::new();
 
-                    let mut messages_per_user = AHashMap::new();
-
-                    macro_rules! append_trigger {
+                macro_rules! append_trigger {
                         ($user:expr, $trig:expr) => {
                             if !messages_per_user.contains_key($user) {
                                 messages_per_user.insert($user.clone(), msg_template.clone());
@@ -157,84 +156,79 @@ impl TwitchClient {
                     }
 
 
-                    let query = sqlx::query_as!(crate::db::TriggerRecordNoId,
+                let query = sqlx::query_as!(crate::db::TriggerRecordNoId,
                         "SELECT discord_user_id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id IN (SELECT discord_user_id FROM channels WHERE channel = ?)",
                         channel_name);
 
-                    let res = query.fetch_all(self.db_con.get_mut()).await;
-                    if let Err(e) = res {
-                        irc_debug!("Error fetching triggers: {}", e);
-                        continue;
-                    }
+                let res = query.fetch_all(self.db_con.get_mut()).await;
+                if res.is_err() {
+                    irc_debug!("Error fetching triggers");
+                }
+                let triggers = res?;
 
-                    let triggers = res.unwrap();
+                for row in triggers {
+                    let discord_id = row.discord_user_id;
+                    let trigger = row.trigger;
+                    let case_sensitive = row.case_sensitive;
+                    let regex = row.regex;
 
-                    for row in triggers {
-                        let discord_id = row.discord_user_id;
-                        let trigger = row.trigger;
-                        let case_sensitive = row.case_sensitive;
-                        let regex = row.regex;
+                    // irc_debug!("Got trigger: `{}` discord {}", trigger, discord_id);
 
-                        // irc_debug!("Got trigger: `{}` discord {}", trigger, discord_id);
-
-                        if regex {
-                            // TODO: Make sure regex in DB is valid (check when putting in)
-                            if case_sensitive {
-                                let re = regex::Regex::new(format!("(?i){}", trigger).as_str()).unwrap();
-                                for mat in re.find_iter(msg) {
-                                    append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
-                                }
-                            } else {
-                                let re = regex::Regex::new(&trigger).unwrap();
-                                for mat in re.find_iter(msg) {
-                                    append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
-                                }
-                            }
-                        } else if case_sensitive {
-                            for pos in msg.match_indices(&trigger) {
-                                append_trigger!(&discord_id, (pos.0 as u16, (pos.0 + trigger.len()) as u16));
+                    if regex {
+                        // TODO: Make sure regex in DB is valid (check when putting in)
+                        if case_sensitive {
+                            let re = regex::Regex::new(format!("(?i){}", trigger).as_str()).unwrap();
+                            for mat in re.find_iter(msg) {
+                                append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
                             }
                         } else {
-                            for pos in msg.to_lowercase().match_indices(&trigger.to_lowercase()) {
-                                append_trigger!(&discord_id, (pos.0 as u16, (pos.0 + trigger.len()) as u16));
+                            let re = regex::Regex::new(&trigger).unwrap();
+                            for mat in re.find_iter(msg) {
+                                append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
                             }
                         }
+                    } else if case_sensitive {
+                        for pos in msg.match_indices(&trigger) {
+                            append_trigger!(&discord_id, (pos.0 as u16, (pos.0 + trigger.len()) as u16));
+                        }
+                    } else {
+                        for pos in msg.to_lowercase().match_indices(&trigger.to_lowercase()) {
+                            append_trigger!(&discord_id, (pos.0 as u16, (pos.0 + trigger.len()) as u16));
+                        }
                     }
+                }
 
-                    for (discord_id, msg) in messages_per_user {
-                        println!("Sending message to discord: {:?}", msg);
-                        self.discord_tx.send(TriggerEvent::new(
-                            discord_id as u64,
-                            msg,
-                            chrono::Utc::now()
-                        )).await.unwrap_or_else(|e| {
-                            println!("ERROR! Too many events in queue, failed to add: {:?}", e);
-                        });
-                    }
-                }
-                // Command::JOIN(ref channels, ref _chan_keys,  ref real_name) => {
-                //     irc_debug!("{} ({:?}) joined {}", author_nickname, real_name, channels);
-                // }
-                // Command::PART(ref channels, ref comment) => {
-                //     irc_debug!("{} left {} ({:?})", author_nickname, channels, comment);
-                // }
-                // Command::QUIT(ref comment) => {
-                //     irc_debug!("{} quit ({:?})", author_nickname, comment);
-                // }
-                // Command::ERROR(ref msg) => {
-                //     irc_debug!("error: {}", msg);
-                // }
-                Command::Raw(ref code, ref args) => {
-                    irc_debug!("raw: {} {:?}", code, args);
-                    // TODO: Handle twitch-specific commands (ex: RECONNECT)
-                }
-                _ => {
-                    // irc_debug!("unhandled: {:?}", message);
+                for (discord_id, msg) in messages_per_user {
+                    println!("Sending message to discord: {:?}", msg);
+                    self.discord_tx.send(TriggerEvent::new(
+                        discord_id as u64,
+                        msg,
+                        chrono::Utc::now()
+                    )).await.unwrap_or_else(|e| {
+                        println!("ERROR! Too many events in queue, failed to add: {:?}", e);
+                    });
                 }
             }
-
+            // Command::JOIN(ref channels, ref _chan_keys,  ref real_name) => {
+            //     irc_debug!("{} ({:?}) joined {}", author_nickname, real_name, channels);
+            // }
+            // Command::PART(ref channels, ref comment) => {
+            //     irc_debug!("{} left {} ({:?})", author_nickname, channels, comment);
+            // }
+            // Command::QUIT(ref comment) => {
+            //     irc_debug!("{} quit ({:?})", author_nickname, comment);
+            // }
+            // Command::ERROR(ref msg) => {
+            //     irc_debug!("error: {}", msg);
+            // }
+            Command::Raw(ref code, ref args) => {
+                irc_debug!("raw: {} {:?}", code, args);
+                // TODO: Handle twitch-specific commands (ex: RECONNECT)
+            }
+            _ => {
+                // irc_debug!("unhandled: {:?}", message);
+            }
         }
-
         Ok(())
     }
 

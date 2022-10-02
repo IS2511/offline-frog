@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use dotenv::dotenv;
 use tokio::sync::mpsc;
 
@@ -7,7 +6,7 @@ mod twitch;
 mod db;
 
 use discord::TriggerEvent;
-use crate::twitch::ChannelJoinPartEvent;
+use crate::twitch::IrcMessageEvent;
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +20,8 @@ async fn main() {
         .await.expect("Failed to acquire database connection");
 
     let (discord_tx, mut discord_rx) = mpsc::channel::<TriggerEvent>(10_000);
-    let (irc_tx, mut irc_rx) = mpsc::channel::<ChannelJoinPartEvent>(1_000);
+    let (irc_tx, mut irc_rx) = mpsc::channel::<IrcMessageEvent>(10_000);
+    let irc_tx_for_irc = irc_tx.clone();
 
     // Run discord bot
     let discord_handle = tokio::spawn(async move {
@@ -45,38 +45,43 @@ async fn main() {
         }
     });
 
+    let mut twitch_client = twitch::make_client(twitch_db_con, discord_tx).await.expect("Failed to make twitch client");
+    let mut twitch_msg_stream = twitch_client.stream().expect("Failed to get twitch message stream");
+
+
     // Run twitch listener
     let twitch_handle = tokio::spawn(async move {
-        let client = twitch::make_client(twitch_db_con, discord_tx).await.expect("Failed to make twitch client");
-        let client = Arc::new(tokio::sync::RwLock::new(client));
-        let client_clone = client.clone();
+        use futures_util::StreamExt; // for next()
+        while let Some(message) = twitch_msg_stream.next().await {
+            if let Ok(message) = message {
+                let res = irc_tx_for_irc.send(IrcMessageEvent::Incoming(message)).await;
+                if res.is_err() {
+                    println!("[IRC] Error sending message to irc thread: {:?}", res.err().unwrap());
+                }
+            } else {
+                println!("[IRC] Error getting message from irc stream: {:?}", message.err().unwrap());
+            }
+        }
+    });
 
-        let irc_sender_thread = tokio::spawn(async move {
-            while let Some(event) = irc_rx.recv().await {
-                match event {
-                    // TODO: Handle join/part errors
-                    ChannelJoinPartEvent::Join(channel) => {
-                        println!("[IRC] Joining channel #{}...", channel);
-                        let res = client_clone.read().await.join_channel(&channel).await;
-                        if let Err(e) = res {
-                            println!("[IRC] Error joining channel: {:?}", e);
-                        }
-                    },
-                    ChannelJoinPartEvent::Part(channel) => {
-                        println!("[IRC] Parting channel #{}...", channel);
-                        let res = client_clone.read().await.part_channel(&channel).await;
-                        if let Err(e) = res {
-                            println!("[IRC] Error parting channel: {:?}", e);
-                        }
-                    },
+    tokio::spawn(async move {
+        while let Some(event) = irc_rx.recv().await {
+            match event {
+                IrcMessageEvent::Incoming(message) => {
+                    let res = twitch_client.handle(&message).await;
+                    if let Err(e) = res {
+                        println!("[IRC] Error handling message: {:?}", e);
+                    }
+                }
+                IrcMessageEvent::Outgoing(message) => {
+                    // println!("Sending message: {:?}", message);
+                    let res = twitch_client.send(message);
+                    if let Err(e) = res {
+                        println!("[IRC] Error sending message: {:?}", e);
+                    }
                 }
             }
-        });
-
-        if let Err(why) = client.write().await.start().await {
-            println!("[IRC] An error occurred while running the client: {:?}", why);
         }
-        irc_sender_thread.await.expect("Failed to join irc_sender_thread");
     });
 
     discord_handle.await.expect("Discord thread panicked");

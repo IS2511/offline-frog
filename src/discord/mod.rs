@@ -9,7 +9,7 @@ use serenity::model::prelude::*;
 use serenity::model::id::UserId;
 use serenity::framework::standard::{StandardFramework};
 use serenity::http::CacheHttp;
-use crate::ChannelJoinPartEvent;
+use crate::IrcMessageEvent;
 
 use crate::twitch::TwitchMessageSimple;
 
@@ -47,7 +47,7 @@ impl TypeMapKey for DbConnection {
 
 struct IrcEventSender;
 impl TypeMapKey for IrcEventSender {
-    type Value = tokio::sync::mpsc::Sender<ChannelJoinPartEvent>;
+    type Value = tokio::sync::mpsc::Sender<IrcMessageEvent>;
 }
 
 struct Handler;
@@ -66,7 +66,7 @@ impl EventHandler for Handler {
     }
 }
 
-pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, irc_tx: tokio::sync::mpsc::Sender<ChannelJoinPartEvent>) -> Client {
+pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, irc_tx: tokio::sync::mpsc::Sender<IrcMessageEvent>) -> Client {
     let prefix = env::var("DISCORD_PREFIX").unwrap_or_else(|_| "frog!".to_string());
 
     // Configure discord bot
