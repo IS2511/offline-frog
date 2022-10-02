@@ -47,8 +47,8 @@ async fn main() {
 
     // Run twitch listener
     let twitch_handle = tokio::spawn(async move {
-        let mut client = twitch::make_client(twitch_db_con, discord_tx).await.expect("Failed to make twitch client");
-        let mut client = Arc::new(tokio::sync::RwLock::new(client));
+        let client = twitch::make_client(twitch_db_con, discord_tx).await.expect("Failed to make twitch client");
+        let client = Arc::new(tokio::sync::RwLock::new(client));
         let client_clone = client.clone();
 
         let irc_sender_thread = tokio::spawn(async move {

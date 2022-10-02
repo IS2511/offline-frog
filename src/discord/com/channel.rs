@@ -5,7 +5,7 @@ use serenity::framework::standard::CommandResult;
 use serenity::framework::standard::macros::{command, group};
 
 use clap::{Parser, Subcommand};
-use sqlx::{Acquire, Row};
+use sqlx::{Acquire};
 use crate::ChannelJoinPartEvent;
 
 use crate::discord::{CommandPrefix, DbConnection, IrcEventSender, styled_str};

@@ -1,6 +1,5 @@
 use irc::client::prelude::*;
 use futures_util::{StreamExt};
-use sqlx::{Executor, Row};
 use thiserror::Error;
 use ahash::AHashMap;
 
@@ -153,13 +152,13 @@ impl TwitchClient {
                     let mut messages_per_user = AHashMap::new();
 
                     macro_rules! append_trigger {
-                    ($user:expr, $trig:expr) => {
-                        if !messages_per_user.contains_key($user) {
-                            messages_per_user.insert($user.clone(), msg_template.clone());
-                        }
-                        messages_per_user.get_mut($user).unwrap().add_trigger($trig);
-                    };
-                }
+                        ($user:expr, $trig:expr) => {
+                            if !messages_per_user.contains_key($user) {
+                                messages_per_user.insert($user.clone(), msg_template.clone());
+                            }
+                            messages_per_user.get_mut($user).unwrap().add_trigger($trig);
+                        };
+                    }
 
 
                     let query = sqlx::query!("SELECT discord_user_id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id IN (SELECT discord_user_id FROM channels WHERE channel = ?)",
