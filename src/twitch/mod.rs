@@ -136,7 +136,7 @@ impl TwitchClient {
 
         match message.command {
             Command::PRIVMSG(ref target, ref msg) => {
-                irc_debug!("{} says to {}: {}", author_nickname, target, msg);
+                // irc_debug!("{} says to {}: {}", author_nickname, target, msg);
 
                 let channel_name = target.strip_prefix('#').unwrap_or(target).to_lowercase();
 
