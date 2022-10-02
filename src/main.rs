@@ -57,11 +57,17 @@ async fn main() {
                     // TODO: Handle join/part errors
                     ChannelJoinPartEvent::Join(channel) => {
                         println!("[IRC] Joining channel #{}...", channel);
-                        client_clone.read().await.join_channel(&channel).await;
+                        let res = client_clone.read().await.join_channel(&channel).await;
+                        if let Err(e) = res {
+                            println!("[IRC] Error joining channel: {:?}", e);
+                        }
                     },
                     ChannelJoinPartEvent::Part(channel) => {
                         println!("[IRC] Parting channel #{}...", channel);
-                        client_clone.read().await.part_channel(&channel).await;
+                        let res = client_clone.read().await.part_channel(&channel).await;
+                        if let Err(e) = res {
+                            println!("[IRC] Error parting channel: {:?}", e);
+                        }
                     },
                 }
             }
