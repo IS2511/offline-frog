@@ -126,7 +126,8 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                         msg.reply(ctx, "Failed to list triggers".to_string()).await?;
                         return Ok(());
                     }
-                    let res = res.unwrap();
+                    let mut res = res.unwrap();
+                    res.sort_by(|a, b| a.id.cmp(&b.id));
                     let mut reply = String::new();
                     for row in res {
                         // TODO: Escape discord styling in `trigger` before printing
