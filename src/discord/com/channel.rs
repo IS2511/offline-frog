@@ -59,6 +59,8 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
         Ok(args) => {
             match args.action {
                 Actions::Add { channels } => {
+                    let channels = channels.iter().map(|c| c.to_lowercase()).collect::<Vec<_>>();
+
                     let mut to_be_joined = AHashSet::new();
                     for channel in &channels {
                         let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
@@ -109,6 +111,8 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                     }
                 },
                 Actions::Remove { channels } => {
+                    let channels = channels.iter().map(|c| c.to_lowercase()).collect::<Vec<_>>();
+
                     let mut tx = db_con.begin().await?;
                     for channel in &channels {
                         let res = sqlx::query!("DELETE FROM channels WHERE discord_user_id = ? AND channel = ?",

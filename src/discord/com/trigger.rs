@@ -61,6 +61,11 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
         Ok(args) => {
             match args.action {
                 Actions::Add { trigger, case_sensitive, regex } => {
+                    let trigger = match case_sensitive {
+                        true => trigger,
+                        false => trigger.to_lowercase(),
+                    };
+
                     let mut tx = db_con.begin().await?;
                     let res = sqlx::query!("INSERT INTO triggers (discord_user_id, trigger, case_sensitive, regex) VALUES (?, ?, ?, ?)",
                         author_id,
