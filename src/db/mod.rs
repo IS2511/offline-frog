@@ -4,8 +4,15 @@ use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};
 
 
-pub struct TriggerRecord {
+pub struct TriggerRecordNoDiscord {
     pub id: i64,
+    pub trigger: String,
+    pub case_sensitive: bool,
+    pub regex: bool,
+}
+
+pub struct TriggerRecordNoId {
+    pub discord_user_id: i64,
     pub trigger: String,
     pub case_sensitive: bool,
     pub regex: bool,

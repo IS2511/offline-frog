@@ -112,7 +112,8 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                     }
                 },
                 Actions::List => {
-                    let res = sqlx::query_as!(crate::db::TriggerRecord, "SELECT id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id = ?",
+                    let res = sqlx::query_as!(crate::db::TriggerRecordNoDiscord,
+                        "SELECT id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id = ?",
                         author_id)
                         .fetch_all(db_con)
                         .await;
