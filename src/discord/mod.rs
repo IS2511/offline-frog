@@ -74,7 +74,7 @@ pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, irc_t
         .configure(|c| {
             let mut owner_ids = HashSet::new();
             let owner_id = env::var("DISCORD_OWNER_ID").unwrap_or_default();
-            if let Some(owner_id_num) = owner_id.parse::<u64>().ok() {
+            if let Ok(owner_id_num) = owner_id.parse::<u64>() {
                 owner_ids.insert(UserId::from(owner_id_num));
             }
 
