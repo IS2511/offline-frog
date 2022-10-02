@@ -74,7 +74,7 @@ pub struct TwitchClient {
     discord_tx: tokio::sync::mpsc::Sender<TriggerEvent>,
 }
 
-pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, tx: tokio::sync::mpsc::Sender<TriggerEvent>) -> Result<TwitchClient, irc::error::Error> {
+pub async fn make_client(mut db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, tx: tokio::sync::mpsc::Sender<TriggerEvent>) -> Result<TwitchClient, irc::error::Error> {
     // We can also load the Config at runtime via Config::load("path/to/config.toml")
     let config = Config {
         nickname: Some(format!("justinfan{}", rand::random::<u32>())),
@@ -87,10 +87,13 @@ pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, tx: t
         use_tls: Some(true),
         server: Some("irc.chat.twitch.tv".to_string()),
         port: Some(6697),
-        // FIXME: Remove all channels but "offline_frog" when done testing
-        // TODO: Keep a list of channels to join in the database,
-        //  join on new channels in DBs
-        channels: vec!["#offline_frog".to_string(), "#is2511".to_owned()],
+        channels: sqlx::query!("SELECT DISTINCT channel FROM channels")
+            .fetch_all(&mut db_con)
+            .await
+            .expect("Failed to fetch channels from DB")
+            .into_iter()
+            .map(|row| format!("#{}", row.channel))
+            .collect::<Vec<String>>(),
         ..Config::default()
     };
 
