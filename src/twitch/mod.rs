@@ -42,7 +42,7 @@ impl TwitchMessageSimple {
 
     pub fn message_highlighted(&self, highlighter: &str) -> String {
         let mut message = self.message.clone();
-        for (start, end) in self.triggers.iter() {
+        for (start, end) in self.triggers.iter().rev() {
             let start = *start as usize;
             let end = *end as usize;
             let with_highlight = format!("{}{}{}", highlighter, &message[start..end], highlighter);
@@ -115,10 +115,6 @@ impl TwitchClient {
         self.client.send(Command::PART(channel.to_string(), None))?;
         Ok(())
     }
-    
-    pub fn get_stream(&mut self) -> Result<irc::client::ClientStream, irc::error::Error> {
-        self.client.stream()
-    }
 
     pub async fn start(&mut self) -> Result<(), IrcThreadError> {
         
@@ -147,7 +143,7 @@ impl TwitchClient {
                         author_nickname.to_string(),
                         msg.to_string()
                     );
-                    irc_debug!("msg_template: {:?}", msg_template);
+                    // irc_debug!("msg_template: {:?}", msg_template);
 
                     let mut messages_per_user = AHashMap::new();
 
@@ -161,29 +157,25 @@ impl TwitchClient {
                     }
 
 
-                    let query = sqlx::query!("SELECT discord_user_id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id IN (SELECT discord_user_id FROM channels WHERE channel = ?)",
+                    let query = sqlx::query_as!(crate::db::TriggerRecordNoId,
+                        "SELECT discord_user_id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id IN (SELECT discord_user_id FROM channels WHERE channel = ?)",
                         channel_name);
 
-                    let mut triggers = self.db_con.get_mut().fetch(query);
+                    let res = query.fetch_all(self.db_con.get_mut()).await;
+                    if let Err(e) = res {
+                        irc_debug!("Error fetching triggers: {}", e);
+                        continue;
+                    }
 
-                    // TODO: Figure this out, "for" eats the boxing I think
-                    for row in triggers.next().await.transpose() {
-                        // if row.is_err() {
-                        //     irc_debug!("SQL error");
-                        //     continue;
-                        // }
-                        if row.is_none() {
-                            irc_debug!("SQL returned None");
-                            continue;
-                        }
-                        let row = row.unwrap();
+                    let triggers = res.unwrap();
 
-                        let discord_id = row.try_get::<i64, &str>("discord_user_id")? as u64;
-                        let trigger = row.try_get::<String, &str>("trigger")?;
-                        let case_sensitive = row.try_get::<bool, &str>("case_sensitive")?;
-                        let regex = row.try_get::<bool, &str>("regex")?;
+                    for row in triggers {
+                        let discord_id = row.discord_user_id;
+                        let trigger = row.trigger;
+                        let case_sensitive = row.case_sensitive;
+                        let regex = row.regex;
 
-                        irc_debug!("Got trigger: `{}` discord {}", trigger, discord_id);
+                        // irc_debug!("Got trigger: `{}` discord {}", trigger, discord_id);
 
                         if regex {
                             // TODO: Make sure regex in DB is valid (check when putting in)
@@ -198,22 +190,21 @@ impl TwitchClient {
                                     append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
                                 }
                             }
+                        } else if case_sensitive {
+                            for pos in msg.match_indices(&trigger) {
+                                append_trigger!(&discord_id, (pos.0 as u16, (pos.0 + trigger.len()) as u16));
+                            }
                         } else {
-                            if case_sensitive {
-                                if let Some(pos) = msg.find(&trigger) {
-                                    append_trigger!(&discord_id, (pos as u16, (pos + trigger.len()) as u16));
-                                }
-                            } else {
-                                if let Some(pos) = msg.to_lowercase().find(&trigger.to_lowercase()) {
-                                    append_trigger!(&discord_id, (pos as u16, (pos + trigger.len()) as u16));
-                                }
+                            for pos in msg.to_lowercase().match_indices(&trigger.to_lowercase()) {
+                                append_trigger!(&discord_id, (pos.0 as u16, (pos.0 + trigger.len()) as u16));
                             }
                         }
                     }
 
                     for (discord_id, msg) in messages_per_user {
+                        println!("Sending message to discord: {:?}", msg);
                         self.discord_tx.send(TriggerEvent::new(
-                            discord_id,
+                            discord_id as u64,
                             msg,
                             chrono::Utc::now()
                         )).await.unwrap_or_else(|e| {
@@ -221,24 +212,24 @@ impl TwitchClient {
                         });
                     }
                 }
-                Command::JOIN(ref channels, ref _chan_keys,  ref real_name) => {
-                    irc_debug!("{} ({:?}) joined {}", author_nickname, real_name, channels);
-                }
-                Command::PART(ref channels, ref comment) => {
-                    irc_debug!("{} left {} ({:?})", author_nickname, channels, comment);
-                }
-                Command::QUIT(ref comment) => {
-                    irc_debug!("{} quit ({:?})", author_nickname, comment);
-                }
-                Command::ERROR(ref msg) => {
-                    irc_debug!("error: {}", msg);
-                }
+                // Command::JOIN(ref channels, ref _chan_keys,  ref real_name) => {
+                //     irc_debug!("{} ({:?}) joined {}", author_nickname, real_name, channels);
+                // }
+                // Command::PART(ref channels, ref comment) => {
+                //     irc_debug!("{} left {} ({:?})", author_nickname, channels, comment);
+                // }
+                // Command::QUIT(ref comment) => {
+                //     irc_debug!("{} quit ({:?})", author_nickname, comment);
+                // }
+                // Command::ERROR(ref msg) => {
+                //     irc_debug!("error: {}", msg);
+                // }
                 Command::Raw(ref code, ref args) => {
                     irc_debug!("raw: {} {:?}", code, args);
                     // TODO: Handle twitch-specific commands (ex: RECONNECT)
                 }
                 _ => {
-                    irc_debug!("unhandled: {:?}", message);
+                    // irc_debug!("unhandled: {:?}", message);
                 }
             }
 
