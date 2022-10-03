@@ -23,7 +23,13 @@ struct Args {
 enum Actions {
     /// Add a trigger to the list of triggers
     Add {
+        // TODO: Split whitespace but preserver quoted substrings
+        // TODO: Reverse-parse discord styling things? Accepts `channel`?
+        //  Somehow allow stuff like \_ because it's what looks valid in discord
+        // TODO: Construct regex and check validity before adding to db
+
         /// Trigger to add (either plain text or regex pattern)
+        // #[arg(num_args = 1..)]
         trigger: String,
 
         /// Take case into account when matching

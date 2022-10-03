@@ -42,12 +42,28 @@ impl TwitchMessageSimple {
     }
 
     pub fn add_trigger(&mut self, trig: (u16, u16)) {
+        // TODO: Check for overlap, merge if any
+        // for i in self.triggers {
+        //     match () {
+        //
+        //     }
+        //     if trig.0 <= i.1 && trig.1 >= i.0 {
+        //         // Overlap
+        //         let new_start = trig.0.min(i.0);
+        //         let new_end = trig.1.max(i.1);
+        //
+        //         self.triggers.retain(|x| x != &i);
+        //         self.triggers.push((new_start, new_end));
+        //         return;
+        //     }
+        // }
         self.triggers.push(trig);
     }
 
     pub fn message_highlighted(&self, highlighter: &str) -> String {
+        // TODO: More consistent highlights, this bonks when multiple triggers in one message
         let mut message = self.message.clone();
-        for (start, end) in self.triggers.iter().rev() {
+        for (start, end) in self.triggers.iter().sorted_by(|a, b| a.0.cmp(&b.0)) {
             let start = *start as usize;
             let end = *end as usize;
             let with_highlight = format!("{}{}{}", highlighter, &message[start..end], highlighter);

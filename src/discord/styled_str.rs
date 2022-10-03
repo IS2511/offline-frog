@@ -70,3 +70,20 @@
 pub fn fmt_args_error(e: &clap::Error) -> String {
     format!("*Invalid command or arguments*\n{}", e.render())
 }
+
+// TODO: Escaping and un-escaping discord-flavored markdown
+
+pub fn escape_twitch_channel(channel: &str) -> String {
+    channel.replace('_', "\\_")
+}
+
+pub fn unescape_twitch_channel(channel: &str) -> String {
+    channel.replace('_', "\\_")
+}
+
+// pub fn escape_markdown(s: &str) -> String {
+//     s.replace('*', "\\*")
+//         .replace('_', "\\_")
+//         .replace('~', "\\~")
+//         .replace('`', "\\`")
+// }
