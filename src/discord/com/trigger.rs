@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Write as _; // import without risk of name clashing
 use serenity::prelude::*;
 use serenity::model::prelude::*;
 use serenity::framework::standard::CommandResult;
@@ -137,7 +138,8 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                     let mut reply = String::new();
                     for row in res {
                         // TODO: Escape discord styling in `trigger` before printing
-                        reply.push_str(&format!("**{}**: `{}` (case_sensitive: {}, regex: {})\n", row.id, row.trigger, row.case_sensitive, row.regex));
+                        let _ = writeln!(reply, "**{}**: `{}` (case_sensitive: {}, regex: {})",
+                                 row.id, row.trigger, row.case_sensitive, row.regex);
                     }
                     msg.channel_id.send_message(ctx, |m|
                         m.embed(|e|
