@@ -137,9 +137,10 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                     res.sort_by(|a, b| a.id.cmp(&b.id));
                     let mut reply = String::new();
                     for row in res {
+                        use crate::discord::extra::IntoEmoji;
                         // TODO: Escape discord styling in `trigger` before printing
                         let _ = writeln!(reply, "**{}**: `{}` (case_sensitive: {}, regex: {})",
-                                 row.id, row.trigger, row.case_sensitive, row.regex);
+                                 row.id, row.trigger, row.case_sensitive.emoji(), row.regex.emoji());
                     }
                     msg.channel_id.send_message(ctx, |m|
                         m.embed(|e|
