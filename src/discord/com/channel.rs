@@ -10,6 +10,7 @@ use sqlx::{Acquire};
 
 use crate::discord::{CommandPrefix, DbConnection, IrcEventSender, styled_str};
 use crate::discord::com::{get_bot_prefix, get_db};
+use crate::discord::styled_str::escape_twitch_channel;
 use crate::twitch::{make_join_msg, make_part_msg};
 
 /// Arguments to the channel command
@@ -162,7 +163,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                         .fetch_all(db_con).await?;
 
                     let mut channels = rows.iter().map(|row|
-                        format!("#{}", row.channel)
+                        format!("#{}", escape_twitch_channel(&row.channel))
                     ).collect::<Vec<_>>();
                     channels.sort();
 
