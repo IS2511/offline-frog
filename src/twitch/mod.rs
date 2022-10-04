@@ -42,34 +42,50 @@ impl TwitchMessageSimple {
     }
 
     pub fn add_trigger(&mut self, trig: (u16, u16)) {
-        // TODO: Check for overlap, merge if any
-        // for i in self.triggers {
-        //     match () {
-        //
-        //     }
-        //     if trig.0 <= i.1 && trig.1 >= i.0 {
-        //         // Overlap
-        //         let new_start = trig.0.min(i.0);
-        //         let new_end = trig.1.max(i.1);
-        //
-        //         self.triggers.retain(|x| x != &i);
-        //         self.triggers.push((new_start, new_end));
-        //         return;
-        //     }
-        // }
-        self.triggers.push(trig);
+        // Insert the trigger sorted by start position
+        let len_before = self.triggers.len();
+        for (i, t) in self.triggers.iter().enumerate() {
+            if trig.0 < t.0 {
+                self.triggers.insert(i, trig);
+                break;
+            }
+        }
+        if self.triggers.len() == len_before {
+            self.triggers.push(trig);
+        }
+        self.normalize_triggers();
     }
 
     pub fn message_highlighted(&self, highlighter: &str) -> String {
         // TODO: More consistent highlights, this bonks when multiple triggers in one message
         let mut message = self.message.clone();
-        for (start, end) in self.triggers.iter().sorted_by(|a, b| a.0.cmp(&b.0)) {
+        // Since triggers should be sorted by start position, we can just reverse the iterator
+        for (start, end) in self.triggers.iter().rev() {
             let start = *start as usize;
             let end = *end as usize;
             let with_highlight = format!("{}{}{}", highlighter, &message[start..end], highlighter);
             message.replace_range(start..end, &with_highlight);
         }
         message
+    }
+
+    fn normalize_triggers(&mut self) {
+        // Normalize triggers to be in order and not overlapping
+        // NOTE: We assume triggers are already sorted by `start` (sorted insert)
+        // Should be O(n), only one pass. Memory is not that good though...
+        let mut new_triggers = Vec::new();
+        let mut last_end = 0;
+        for (start, end) in self.triggers.iter() {
+            if *start >= last_end {
+                new_triggers.push((*start, *end));
+                last_end = *end;
+            } else if *end > last_end {
+                let len = new_triggers.len();
+                new_triggers.get_mut(len - 1).unwrap().1 = *end;
+                last_end = *end;
+            }
+        }
+        self.triggers = new_triggers;
     }
 }
 
