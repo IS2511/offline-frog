@@ -212,12 +212,12 @@ impl TwitchClient {
                     if regex {
                         // TODO: Make sure regex in DB is valid (check when putting in)
                         if case_sensitive {
-                            let re = regex::Regex::new(format!("(?i){}", trigger).as_str()).unwrap();
+                            let re = regex::Regex::new(&trigger).unwrap();
                             for mat in re.find_iter(msg) {
                                 append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
                             }
                         } else {
-                            let re = regex::Regex::new(&trigger).unwrap();
+                            let re = regex::Regex::new(format!("(?i:{})", trigger).as_str()).unwrap();
                             for mat in re.find_iter(msg) {
                                 append_trigger!(&discord_id, (mat.start() as u16, mat.end() as u16));
                             }
