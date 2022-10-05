@@ -44,7 +44,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.send_message(ctx, |m| {
         m.embed(|e| {
             e.title("Help");
-            e.description("Me when help lol\n\nWhy is this text styled so bad? I don't know, I'm not a designer.\nDiscord eats whitespaces and I don't want to make the whole thing a code block :shrug:");
+            e.description("Basic flow:\n1) Add channels you are interested in\n2) Add at least one trigger (ex: your twitch username)\n3) Get a DM when someone says your trigger in a channel you are monitoring\n\nGet pinged <:tf:1027007493764821083>");
             e.fields(vec![
                 ("General",
                  cmd_list!(
@@ -58,10 +58,11 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
                      cmd!("channel list", "List all channels in watchlist")
                  ), false),
                 ("Trigger", cmd_list!(
-                     cmd!("trigger add <trigger>", "Add plaintext match trigger (ex: \"AzureDiamond\")"),
+                     // cmd!("trigger add `\\``<trigger>`\\`` ", "Add plaintext match trigger (ex: \"AzureDiamond\")"),
+                     format!("```{}trigger add `<trigger>`\n```Add plaintext match trigger (ex: \"AzureDiamond\")\n", prefix).as_str(),
                     "`\t-r, --regex`\tAdd regex match trigger (ex: *todo*)\n",
                     "`\t           `\tThe regex flavour is Rust, see [docs](https://docs.rs/regex/latest/regex/#syntax), test [live](https://rustexp.lpil.uk/)\n",
-                    "`\t-c, --case-sensitive`\tMatch case-sensitive (default: case-insensitive)\n",
+                    "`\t-c, --case-sensitive`\tMatch case-sensitive (default: case-insensitive)\n\n",
                      cmd!("trigger remove <ids>", "Remove triggers with specified ids"),
                      cmd!("trigger list", "List all triggers and their ids")
                  ), false),
