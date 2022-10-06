@@ -8,8 +8,8 @@ use serenity::framework::standard::macros::{command, group};
 use clap::{Parser, Subcommand};
 use sqlx::{Acquire};
 
-use crate::discord::{CommandPrefix, DbConnection, IrcEventSender, styled_str};
-use crate::discord::com::{get_bot_prefix, get_db};
+use crate::discord::{CommandPrefix, ChannelCount, DbConnection, IrcEventSender, styled_str};
+use crate::discord::com::{get_bot_prefix, get_db, update_channel_count};
 use crate::discord::styled_str::escape_twitch_channel;
 use crate::twitch::{make_join_msg, make_part_msg};
 
@@ -60,104 +60,119 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                 Actions::Add { channels } => {
                     let channels = channels.iter().map(|c| c.to_lowercase()).collect::<Vec<_>>();
 
-                    get_db!(ctx, db);
-
                     let mut to_be_joined = AHashSet::new();
-                    for channel in &channels {
-                        let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
-                            .fetch_one(&mut *db).await?;
-                        let exists: bool = res.result == 1;
-                        // println!("ADD Channel #{} exists: {}", channel, exists);
-                        if !exists {
-                            to_be_joined.insert(channel);
-                        }
-                    }
-                    // println!("ADD Channels to be joined: {:?}", to_be_joined);
 
-                    let mut tx = db.begin().await?;
-                    for channel in &channels {
-                        let res = sqlx::query!("INSERT OR IGNORE INTO channels (discord_user_id, channel) VALUES (?, ?)",
+                    {
+                        get_db!(ctx, db);
+
+                        for channel in &channels {
+                            let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
+                                .fetch_one(&mut *db).await?;
+                            let exists: bool = res.result == 1;
+                            // println!("ADD Channel #{} exists: {}", channel, exists);
+                            if !exists {
+                                to_be_joined.insert(channel);
+                            }
+                        }
+                        // println!("ADD Channels to be joined: {:?}", to_be_joined);
+
+                        let mut tx = db.begin().await?;
+                        for channel in &channels {
+                            let res = sqlx::query!("INSERT OR IGNORE INTO channels (discord_user_id, channel) VALUES (?, ?)",
                             author_id,
                             channel)
-                            .execute(&mut tx).await;
-                        if let Err(e) = res {
-                            to_be_joined.remove(channel);
-                            match e {
-                                sqlx::Error::Database(e) => {
-                                    let code = e.code().unwrap_or(Cow::Borrowed(""));
-                                    if code == "2067" { // SQLITE_CONSTRAINT_UNIQUE (UNIQUE constraint failed)
-                                        msg.reply(ctx, format!("Channel {} is already in the list", channel)).await?;
-                                    } else {
-                                        // msg.reply(ctx, format!("Error adding channel #{}: {}", channel, e.message())).await?;
+                                .execute(&mut tx).await;
+                            if let Err(e) = res {
+                                to_be_joined.remove(channel);
+                                match e {
+                                    sqlx::Error::Database(e) => {
+                                        let code = e.code().unwrap_or(Cow::Borrowed(""));
+                                        if code == "2067" { // SQLITE_CONSTRAINT_UNIQUE (UNIQUE constraint failed)
+                                            msg.reply(ctx, format!("Channel {} is already in the list", channel)).await?;
+                                        } else {
+                                            // msg.reply(ctx, format!("Error adding channel #{}: {}", channel, e.message())).await?;
+                                            msg.reply(ctx, format!("Error adding channel #{}", channel)).await?;
+                                        }
+                                    }
+                                    _ => {
+                                        // msg.reply(ctx, format!("Error adding channel {}: {:?}", &channel, e)).await?;
                                         msg.reply(ctx, format!("Error adding channel #{}", channel)).await?;
                                     }
-                                },
-                                _ => {
-                                    // msg.reply(ctx, format!("Error adding channel {}: {:?}", &channel, e)).await?;
-                                    msg.reply(ctx, format!("Error adding channel #{}", channel)).await?;
                                 }
                             }
                         }
-                    }
-                    match tx.commit().await {
-                        Ok(_) => { msg.reply(ctx, "Added channels").await?; },
-                        // TODO: Make so no data leaks through the error message
-                        Err(e) => { msg.reply(ctx, format!("Error adding channels: {:?}", e)).await?; },
+                        match tx.commit().await {
+                            Ok(_) => { msg.reply(ctx, "Added channels").await?; }
+                            // TODO: Make so no data leaks through the error message
+                            Err(e) => { msg.reply(ctx, format!("Error adding channels: {:?}", e)).await?; }
+                        }
                     }
 
+                    let joined_count = to_be_joined.len();
                     // println!("ADD Channels to be actually joined: {:?}", to_be_joined);
                     for channel in to_be_joined {
                         // msg.reply(ctx, format!("*Fun fact*: Channel #{} wasn't tracked by this bot before, but now is!", channel)).await?;
                         irc_tx.send(make_join_msg(channel.clone())).await?;
                     }
+
+                    update_channel_count!(ctx, joined_count as i32);
                 },
                 Actions::Remove { channels } => {
                     let channels = channels.iter().map(|c| c.to_lowercase()).collect::<Vec<_>>();
 
-                    get_db!(ctx, db);
+                    {
+                        get_db!(ctx, db);
 
-                    let mut tx = db.begin().await?;
-                    for channel in &channels {
-                        let res = sqlx::query!("DELETE FROM channels WHERE discord_user_id = ? AND channel = ?",
+                        let mut tx = db.begin().await?;
+                        for channel in &channels {
+                            let res = sqlx::query!("DELETE FROM channels WHERE discord_user_id = ? AND channel = ?",
                             author_id,
                             channel)
-                            .execute(&mut tx).await;
-                        if let Err(e) = res {
-                            // msg.reply(ctx, format!("Error removing channel #{}", &channel)).await?;
-                            match e {
-                                sqlx::Error::Database(e) => {
-                                    let code = e.code().unwrap_or(Cow::Borrowed(""));
-                                    msg.reply(ctx, format!("Error removing channel #{}: `{}`", channel, code)).await?;
-                                    // if code == "2067" { // SQLITE_CONSTRAINT_UNIQUE (UNIQUE constraint failed)
-                                    //     msg.reply(ctx, format!("Channel {} is not in the list", &channel)).await?;
-                                    // } else {
-                                    //     // msg.reply(ctx, format!("Error removing channel #{}: {}", channel, e.message())).await?;
-                                    //     msg.reply(ctx, format!("Error removing channel #{}", &channel)).await?;
-                                    // }
-                                },
-                                _ => {
-                                    // msg.reply(ctx, format!("Error removing channel {}: {:?}", &channel, e)).await?;
-                                    msg.reply(ctx, format!("Error removing channel #{}", channel)).await?;
+                                .execute(&mut tx).await;
+                            if let Err(e) = res {
+                                // msg.reply(ctx, format!("Error removing channel #{}", &channel)).await?;
+                                match e {
+                                    sqlx::Error::Database(e) => {
+                                        let code = e.code().unwrap_or(Cow::Borrowed(""));
+                                        msg.reply(ctx, format!("Error removing channel #{}: `{}`", channel, code)).await?;
+                                        // if code == "2067" { // SQLITE_CONSTRAINT_UNIQUE (UNIQUE constraint failed)
+                                        //     msg.reply(ctx, format!("Channel {} is not in the list", &channel)).await?;
+                                        // } else {
+                                        //     // msg.reply(ctx, format!("Error removing channel #{}: {}", channel, e.message())).await?;
+                                        //     msg.reply(ctx, format!("Error removing channel #{}", &channel)).await?;
+                                        // }
+                                    }
+                                    _ => {
+                                        // msg.reply(ctx, format!("Error removing channel {}: {:?}", &channel, e)).await?;
+                                        msg.reply(ctx, format!("Error removing channel #{}", channel)).await?;
+                                    }
                                 }
                             }
                         }
-                    }
-                    match tx.commit().await {
-                        Ok(_) => { msg.reply(ctx, "Removed channels").await?; },
-                        // TODO: Make so no data leaks through the error message
-                        Err(e) => { msg.reply(ctx, format!("Error removing channels: {:?}", e)).await?; },
-                    }
-
-                    for channel in &channels {
-                        let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
-                            .fetch_one(&mut *db).await?;
-                        let exists: bool = res.result == 1;
-                        // println!("REMOVE Channel #{} exists: {}", channel, exists);
-                        if !exists {
-                            // msg.reply(ctx, format!("*Fun fact*: Channel #{} no longer needs tracking from this bot!", channel)).await?;
-                            irc_tx.send(make_part_msg(channel.clone())).await?;
+                        match tx.commit().await {
+                            Ok(_) => { msg.reply(ctx, "Removed channels").await?; }
+                            // TODO: Make so no data leaks through the error message
+                            Err(e) => { msg.reply(ctx, format!("Error removing channels: {:?}", e)).await?; }
                         }
                     }
+
+                    let mut removed_channel_count = 0;
+                    {
+                        get_db!(ctx, db);
+
+                        for channel in &channels {
+                            let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
+                                .fetch_one(&mut *db).await?;
+                            let exists: bool = res.result == 1;
+                            // println!("REMOVE Channel #{} exists: {}", channel, exists);
+                            if !exists {
+                                // msg.reply(ctx, format!("*Fun fact*: Channel #{} no longer needs tracking from this bot!", channel)).await?;
+                                irc_tx.send(make_part_msg(channel.clone())).await?;
+                                removed_channel_count += 1;
+                            }
+                        }
+                    }
+                    update_channel_count!(ctx, -removed_channel_count);
                 },
                 Actions::List => {
                     get_db!(ctx, db);

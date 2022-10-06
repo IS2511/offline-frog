@@ -46,5 +46,6 @@ SELECT id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id = 
 SELECT EXISTS(SELECT 1 FROM channels WHERE channel = 'weest');
 
 SELECT DISTINCT channel FROM channels;
+SELECT COUNT(DISTINCT channel) FROM channels;
 
 ```

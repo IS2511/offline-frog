@@ -26,3 +26,24 @@ macro_rules! get_bot_prefix {
     };
 }
 pub(crate) use get_bot_prefix;
+
+macro_rules! update_channel_count {
+    ($ctx:expr, $delta:expr) => {
+        {
+            let prefix = get_bot_prefix!($ctx);
+            let channel_count = {
+                let data = $ctx.data.read().await;
+                data.get::<ChannelCount>().unwrap().clone()
+            };
+            let channel_count = channel_count + $delta;
+
+            {
+                let mut data = $ctx.data.write().await;
+                data.insert::<ChannelCount>(channel_count);
+            }
+
+            $ctx.set_activity(Activity::watching(format!("{} chats | DM {}help", channel_count, prefix))).await;
+        }
+    };
+}
+pub(crate) use update_channel_count;

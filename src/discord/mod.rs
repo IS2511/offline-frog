@@ -9,7 +9,7 @@ use serenity::model::prelude::*;
 use serenity::model::id::UserId;
 use serenity::framework::standard::{StandardFramework};
 use serenity::http::CacheHttp;
-use crate::discord::com::get_bot_prefix;
+use crate::discord::com::{get_bot_prefix, update_channel_count};
 use crate::IrcMessageEvent;
 
 use crate::twitch::TwitchMessageSimple;
@@ -37,20 +37,19 @@ impl TriggerEvent {
     }
 }
 
-struct CommandPrefix;
-impl TypeMapKey for CommandPrefix {
-    type Value = String;
+macro_rules! make_type_key {
+    ($name:ident, $t:ty) => {
+        struct $name;
+        impl TypeMapKey for $name {
+            type Value = $t;
+        }
+    };
 }
 
-struct DbConnection;
-impl TypeMapKey for DbConnection {
-    type Value = Mutex<sqlx::pool::PoolConnection<sqlx::Sqlite>>;
-}
-
-struct IrcEventSender;
-impl TypeMapKey for IrcEventSender {
-    type Value = tokio::sync::mpsc::Sender<IrcMessageEvent>;
-}
+make_type_key!(ChannelCount, i32);
+make_type_key!(CommandPrefix, String);
+make_type_key!(DbConnection, Mutex<sqlx::pool::PoolConnection<sqlx::Sqlite>>);
+make_type_key!(IrcEventSender, tokio::sync::mpsc::Sender<IrcMessageEvent>);
 
 struct Handler;
 
@@ -58,14 +57,12 @@ struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("`{}` connected!", ready.user.tag());
-        
-        let prefix = get_bot_prefix!(ctx);
 
-        ctx.set_activity(Activity::playing(format!("DM {}help", prefix))).await;
+        update_channel_count!(ctx, 0);
     }
 }
 
-pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, irc_tx: tokio::sync::mpsc::Sender<IrcMessageEvent>) -> Client {
+pub async fn make_client(mut db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, irc_tx: tokio::sync::mpsc::Sender<IrcMessageEvent>) -> Client {
     let prefix = env::var("DISCORD_PREFIX").unwrap_or_else(|_| "frog!".to_string());
 
     // Configure discord bot
@@ -92,9 +89,20 @@ pub async fn make_client(db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, irc_t
         .await
         .expect("Error creating client");
 
-    d_client.data.write().await.insert::<CommandPrefix>(prefix.clone());
-    d_client.data.write().await.insert::<DbConnection>(Mutex::new(db_con));
-    d_client.data.write().await.insert::<IrcEventSender>(irc_tx);
+
+    let channel_count = sqlx::query!("SELECT COUNT(DISTINCT channel) as count FROM channels")
+        .fetch_one(&mut db_con)
+        .await
+        .expect("Error counting channels in DB")
+        .count;
+
+    {
+        let mut data = d_client.data.write().await;
+        data.insert::<ChannelCount>(channel_count);
+        data.insert::<CommandPrefix>(prefix.clone());
+        data.insert::<DbConnection>(Mutex::new(db_con));
+        data.insert::<IrcEventSender>(irc_tx);
+    }
 
     d_client
 }
