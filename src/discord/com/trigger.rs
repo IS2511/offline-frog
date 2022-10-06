@@ -60,8 +60,6 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
 
     let args = Args::try_parse_from(msg.content.trim_start_matches(&prefix).split_whitespace());
 
-    get_db!(ctx, db_con);
-
     let author_id = msg.author.id.0 as i64;
 
     match args {
@@ -73,7 +71,9 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                         false => trigger.to_lowercase(),
                     };
 
-                    let mut tx = db_con.begin().await?;
+                    get_db!(ctx, db);
+
+                    let mut tx = db.begin().await?;
                     let res = sqlx::query!("INSERT INTO triggers (discord_user_id, trigger, case_sensitive, regex) VALUES (?, ?, ?, ?)",
                         author_id,
                         trigger,
@@ -102,32 +102,61 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                     }
                 }
                 Actions::Remove { ids } => {
-                    let mut tx = db_con.begin().await?;
-                    let mut failed_list = Vec::new();
+                    let triggers = {
+                        get_db!(ctx, db);
+
+                        let triggers = sqlx::query!("SELECT id FROM triggers WHERE discord_user_id = ?",
+                        author_id)
+                            .fetch_all(db)
+                            .await;
+                        if triggers.is_err() {
+                            msg.reply(ctx, "Failed to get triggers".to_string()).await?;
+                            return Ok(());
+                        }
+                        let triggers = triggers.unwrap();
+                        let mut triggers: Vec<i64> = triggers.iter().map(|i| i.id).collect();
+                        triggers.sort();
+                        triggers
+                    };
+
+                    get_db!(ctx, db);
+
+                    let mut tx = db.begin().await?;
+                    let mut failed_ids = Vec::new();
+                    let triggers_len = triggers.len() as i64;
                     for id in &ids {
+                        if (id > &triggers_len) || (id < &1) {
+                            failed_ids.push(id.to_string());
+                            break;
+                        }
+                        let id = (id - 1) as usize;
+                        let trigger_id = triggers[id] as i64;
                         let res = sqlx::query!("DELETE FROM triggers WHERE discord_user_id = ? AND id = ?",
                             author_id,
-                            id)
+                            trigger_id)
                             .execute(&mut tx)
                             .await;
                         if res.is_err() {
-                            failed_list.push(id.to_string());
+                            failed_ids.push(id.to_string());
+                            break;
                         }
                     }
-                    if failed_list.is_empty() {
+                    if failed_ids.is_empty() {
                         tx.commit().await?;
                         msg.reply(ctx, format!("Removed {} triggers", ids.len())).await?;
                     } else {
                         tx.rollback().await?;
-                        // msg.reply(ctx, format!("Failed to remove triggers: `{}`", failed_list.join(", "))).await?;
-                        msg.reply(ctx, format!("Failed to remove trigger: `{}`", failed_list[0])).await?;
+                        // msg.reply(ctx, format!("Failed to remove triggers: **{}**", failed_ids.join(", "))).await?;
+                        msg.reply(ctx, format!("Failed to remove trigger: **{}**. Rollback.", failed_ids[0])).await?;
                     }
                 },
                 Actions::List => {
+                    get_db!(ctx, db);
+
                     let res = sqlx::query_as!(crate::db::TriggerRecordNoDiscord,
                         "SELECT id, trigger, case_sensitive, regex FROM triggers WHERE discord_user_id = ?",
                         author_id)
-                        .fetch_all(db_con)
+                        .fetch_all(db)
                         .await;
                     if res.is_err() {
                         msg.reply(ctx, "Failed to list triggers".to_string()).await?;
@@ -136,11 +165,12 @@ async fn trigger(ctx: &Context, msg: &Message) -> CommandResult {
                     let mut res = res.unwrap();
                     res.sort_by(|a, b| a.id.cmp(&b.id));
                     let mut reply = String::new();
+                    let mut i = 1;
                     for row in res {
                         use crate::discord::extra::IntoEmoji;
-                        // TODO: Escape discord styling in `trigger` before printing
-                        let _ = writeln!(reply, "**{}**: `{}` (case_sensitive: {}, regex: {})",
-                                 row.id, row.trigger, row.case_sensitive.emoji(), row.regex.emoji());
+                        let _ = writeln!(reply, "**ID {}**: `{}` (case_sensitive: {}, regex: {})",
+                                 i, row.trigger, row.case_sensitive.emoji(), row.regex.emoji());
+                        i += 1;
                     }
                     msg.channel_id.send_message(ctx, |m|
                         m.embed(|e|

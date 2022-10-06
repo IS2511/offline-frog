@@ -52,8 +52,6 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
         data.get::<IrcEventSender>().unwrap().clone()
     };
 
-    get_db!(ctx, db_con);
-
     let author_id = msg.author.id.0 as i64;
 
     match args {
@@ -62,10 +60,12 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                 Actions::Add { channels } => {
                     let channels = channels.iter().map(|c| c.to_lowercase()).collect::<Vec<_>>();
 
+                    get_db!(ctx, db);
+
                     let mut to_be_joined = AHashSet::new();
                     for channel in &channels {
                         let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
-                            .fetch_one(&mut *db_con).await?;
+                            .fetch_one(&mut *db).await?;
                         let exists: bool = res.result == 1;
                         // println!("ADD Channel #{} exists: {}", channel, exists);
                         if !exists {
@@ -74,7 +74,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                     }
                     // println!("ADD Channels to be joined: {:?}", to_be_joined);
 
-                    let mut tx = db_con.begin().await?;
+                    let mut tx = db.begin().await?;
                     for channel in &channels {
                         let res = sqlx::query!("INSERT OR IGNORE INTO channels (discord_user_id, channel) VALUES (?, ?)",
                             author_id,
@@ -114,7 +114,9 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                 Actions::Remove { channels } => {
                     let channels = channels.iter().map(|c| c.to_lowercase()).collect::<Vec<_>>();
 
-                    let mut tx = db_con.begin().await?;
+                    get_db!(ctx, db);
+
+                    let mut tx = db.begin().await?;
                     for channel in &channels {
                         let res = sqlx::query!("DELETE FROM channels WHERE discord_user_id = ? AND channel = ?",
                             author_id,
@@ -148,7 +150,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
 
                     for channel in &channels {
                         let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
-                            .fetch_one(&mut *db_con).await?;
+                            .fetch_one(&mut *db).await?;
                         let exists: bool = res.result == 1;
                         // println!("REMOVE Channel #{} exists: {}", channel, exists);
                         if !exists {
@@ -158,9 +160,11 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                     }
                 },
                 Actions::List => {
+                    get_db!(ctx, db);
+
                     let rows = sqlx::query!("SELECT channel FROM channels WHERE discord_user_id = ?",
                         author_id)
-                        .fetch_all(db_con).await?;
+                        .fetch_all(db).await?;
 
                     let mut channels = rows.iter().map(|row|
                         format!("#{}", escape_twitch_channel(&row.channel))
