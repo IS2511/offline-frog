@@ -9,6 +9,7 @@ use serenity::model::prelude::*;
 use serenity::model::id::UserId;
 use serenity::framework::standard::{StandardFramework};
 use serenity::http::CacheHttp;
+use crate::discord::com::get_bot_prefix;
 use crate::IrcMessageEvent;
 
 use crate::twitch::TwitchMessageSimple;
@@ -58,10 +59,7 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("`{}` connected!", ready.user.tag());
         
-        let prefix = {
-            let data = ctx.data.read().await;
-            data.get::<CommandPrefix>().unwrap().clone()
-        };
+        let prefix = get_bot_prefix!(ctx);
 
         ctx.set_activity(Activity::playing(format!("DM {}help", prefix))).await;
     }
