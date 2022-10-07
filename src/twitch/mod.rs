@@ -244,9 +244,12 @@ impl TwitchClient {
                     });
                 }
             }
-            // Command::JOIN(ref channels, ref _chan_keys,  ref real_name) => {
-            //     irc_debug!("{} ({:?}) joined {}", author_nickname, real_name, channels);
-            // }
+            Command::JOIN(ref _channels, ref _chan_keys,  ref _real_name) => {
+                // irc_debug!("{} ({:?}) joined {}", author_nickname, real_name, channels);
+                if author_nickname == self.client.current_nickname() {
+                    // Just successfully joined a channel, report back?
+                }
+            }
             // Command::PART(ref channels, ref comment) => {
             //     irc_debug!("{} left {} ({:?})", author_nickname, channels, comment);
             // }
@@ -256,10 +259,24 @@ impl TwitchClient {
             // Command::ERROR(ref msg) => {
             //     irc_debug!("error: {}", msg);
             // }
-            Command::Raw(ref code, ref args) => {
-                irc_debug!("raw: {} {:?}", code, args);
-                // TODO: Handle twitch-specific commands (ex: RECONNECT)
+            Command::Response(ref response, ref args) => {
+                match response {
+                    Response::RPL_WELCOME => {
+                        // irc_debug!("Connected to IRC");
+                        println!("`{}` connected!", args[0]);
+                    }
+                    Response::RPL_NAMREPLY => {
+                        // irc_debug!("{:?}", args);
+                    }
+                    _ => {
+                        // irc_debug!("Response: {:?}", response);
+                    }
+                }
             }
+            // Command::Raw(ref code, ref args) => {
+            //     irc_debug!("raw: {} {:?}", code, args);
+            //     // TODO: Handle twitch-specific commands (ex: RECONNECT)
+            // }
             _ => {
                 // irc_debug!("unhandled: {:?}", message);
             }
