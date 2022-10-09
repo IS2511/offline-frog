@@ -102,6 +102,7 @@ pub enum IrcThreadError {
 
 pub struct TwitchClient {
     client: Client,
+    config: Config,
     db_con: tokio::sync::Mutex<sqlx::pool::PoolConnection<sqlx::Sqlite>>,
     discord_tx: tokio::sync::mpsc::Sender<TriggerEvent>,
 }
@@ -129,7 +130,7 @@ pub async fn make_client(mut db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, t
         ..Config::default()
     };
 
-    let client = Client::from_config(config).await?;
+    let client = Client::from_config(config.clone()).await?;
     client.identify()?;
     // client.send(Command::CAP(
     //     None,
@@ -139,6 +140,7 @@ pub async fn make_client(mut db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, t
 
     Ok(TwitchClient {
         client,
+        config,
         db_con: tokio::sync::Mutex::new(db_con),
         discord_tx: tx,
     })
@@ -273,10 +275,18 @@ impl TwitchClient {
                     }
                 }
             }
-            // Command::Raw(ref code, ref args) => {
-            //     irc_debug!("raw: {} {:?}", code, args);
-            //     // TODO: Handle twitch-specific commands (ex: RECONNECT)
-            // }
+            Command::Raw(ref code, ref args) => {
+                irc_debug!("raw: {} {:?}", code, args);
+                // TODO: Handle twitch-specific commands (ex: RECONNECT)
+                match code.as_str() {
+                    "RECONNECT" => {
+                        let mut config = self.config.clone();
+                        config.channels = self.client.list_channels().unwrap();
+                        self.client = Client::from_config(config).await?;
+                    }
+                    _ => {}
+                };
+            }
             _ => {
                 // irc_debug!("unhandled: {:?}", message);
             }
