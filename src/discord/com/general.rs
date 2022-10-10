@@ -66,6 +66,11 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
                      cmd!("trigger remove <ids>", "Remove triggers with specified ids"),
                      cmd!("trigger list", "List all triggers and their ids")
                  ), false),
+                ("Ignore", cmd_list!(
+                     cmd!("ignore add <usernames>", "Add usernames to the list of ignored users"),
+                     cmd!("ignore remove <usernames>", "Remove usernames from the list of ignored users"),
+                     cmd!("ignore list", "List all usernames of ignored users")
+                 ), false),
             ]);
             e
         });
