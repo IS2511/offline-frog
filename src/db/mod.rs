@@ -51,6 +51,16 @@ pub async fn setup() -> Result<Pool<Sqlite>, sqlx::Error> {
                 )
             "#).execute(&pool).await?;
 
+    sqlx::query!(
+        r#"CREATE TABLE IF NOT EXISTS ignores
+                (
+                    id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    discord_user_id INTEGER NOT NULL,
+                    username        TEXT NOT NULL,
+                    UNIQUE(discord_user_id, username) ON CONFLICT FAIL
+                )
+            "#).execute(&pool).await?;
+
     tx.commit().await?;
 
     Ok(pool)

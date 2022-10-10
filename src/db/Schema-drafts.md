@@ -19,11 +19,21 @@ CREATE TABLE IF NOT EXISTS triggers
     UNIQUE(discord_user_id, trigger, regex) ON CONFLICT FAIL
 );
 
+CREATE TABLE IF NOT EXISTS ignores
+(
+    id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    discord_user_id INTEGER NOT NULL,
+    username        TEXT NOT NULL,
+    UNIQUE(discord_user_id, username) ON CONFLICT FAIL
+);
+
 -- DROP TABLE IF EXISTS channels;
 -- DROP TABLE IF EXISTS triggers;
+-- DROP TABLE IF EXISTS ignores;
 
 -- DELETE FROM channels;
 -- DELETE FROM triggers;
+-- DELETE FROM ignores;
 
 INSERT INTO channels (discord_user_id, channel) VALUES (206528846026113024, 'weest');
 INSERT INTO channels (discord_user_id, channel) VALUES (206528846026113024, 'tajj');
@@ -47,5 +57,7 @@ SELECT EXISTS(SELECT 1 FROM channels WHERE channel = 'weest');
 
 SELECT DISTINCT channel FROM channels;
 SELECT COUNT(DISTINCT channel) FROM channels;
+
+SELECT username FROM ignores WHERE discord_user_id = 206528846026113024;
 
 ```
