@@ -203,6 +203,20 @@ impl TwitchClient {
                 }
                 let triggers = res?;
 
+                let mut ignores_per_user = AHashMap::new();
+                for row in &triggers {
+                    let query = sqlx::query!("SELECT username FROM ignores WHERE discord_user_id = ?", row.discord_user_id);
+                    let res = query.fetch_all(self.db_con.get_mut()).await;
+                    if res.is_err() {
+                        irc_debug!("Error fetching ignores");
+                    }
+                    let ignores = res?;
+                    ignores_per_user.insert(row.discord_user_id,
+                                            ignores.into_iter()
+                                                .map(|row| row.username)
+                                                .collect::<Vec<String>>());
+                }
+
                 for row in triggers {
                     let discord_id = row.discord_user_id;
                     let trigger = row.trigger;
@@ -210,6 +224,11 @@ impl TwitchClient {
                     let regex = row.regex;
 
                     // irc_debug!("Got trigger: `{}` discord {}", trigger, discord_id);
+
+                    if ignores_per_user[&discord_id].iter().any(|username| username == author_nickname) {
+                        // irc_debug!("Ignoring {} because they are on the ignore list", author_nickname);
+                        continue;
+                    }
 
                     if regex {
                         // TODO: Make sure regex in DB is valid (check when putting in)
