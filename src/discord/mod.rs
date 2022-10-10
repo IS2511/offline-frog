@@ -78,7 +78,8 @@ pub async fn make_client(mut db_con: sqlx::pool::PoolConnection<sqlx::Sqlite>, i
         })
         .group(&com::GENERAL_GROUP)
         .group(&com::CHANNEL_GROUP)
-        .group(&com::TRIGGER_GROUP);
+        .group(&com::TRIGGER_GROUP)
+        .group(&com::IGNORE_GROUP);
 
     // Login discord bot
     let d_token = env::var("DISCORD_TOKEN").expect("token");

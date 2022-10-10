@@ -2,10 +2,12 @@
 mod general;
 mod channel;
 mod trigger;
+mod ignore;
 
 pub use general::GENERAL_GROUP;
 pub use channel::CHANNEL_GROUP;
 pub use trigger::TRIGGER_GROUP;
+pub use ignore::IGNORE_GROUP;
 
 
 macro_rules! get_db {
