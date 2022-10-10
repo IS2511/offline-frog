@@ -60,7 +60,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
                 ("Trigger", cmd_list!(
                      // cmd!("trigger add `\\``<trigger>`\\`` ", "Add plaintext match trigger (ex: \"AzureDiamond\")"),
                      format!("```{}trigger add `<trigger>`\n```Add plaintext match trigger (ex: \"AzureDiamond\")\n", prefix).as_str(),
-                    "`\t-r, --regex`\tAdd regex match trigger (ex: *todo*)\n",
+                    "`\t-r, --regex`\tAdd regex match trigger (ex: \"@is$|@is\\s\")\n",
                     "`\t           `\tThe regex flavour is Rust, see [docs](https://docs.rs/regex/latest/regex/#syntax), test [live](https://rustexp.lpil.uk/)\n",
                     "`\t-c, --case-sensitive`\tMatch case-sensitive (default: case-insensitive)\n\n",
                      cmd!("trigger remove <ids>", "Remove triggers with specified ids"),
