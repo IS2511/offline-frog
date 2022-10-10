@@ -184,13 +184,13 @@ impl TwitchClient {
                 let mut messages_per_user = AHashMap::new();
 
                 macro_rules! append_trigger {
-                        ($user:expr, $trig:expr) => {
-                            if !messages_per_user.contains_key($user) {
-                                messages_per_user.insert($user.clone(), msg_template.clone());
-                            }
-                            messages_per_user.get_mut($user).unwrap().add_trigger($trig);
-                        };
-                    }
+                    ($user:expr, $trig:expr) => {
+                        if !messages_per_user.contains_key($user) {
+                            messages_per_user.insert($user.clone(), msg_template.clone());
+                        }
+                        messages_per_user.get_mut($user).unwrap().add_trigger($trig);
+                    };
+                }
 
 
                 let query = sqlx::query_as!(crate::db::TriggerRecordNoId,
