@@ -78,7 +78,7 @@ async fn ignore(ctx: &Context, msg: &Message) -> CommandResult {
                         }
                     }
                     match tx.commit().await {
-                        Ok(_) => { msg.reply(ctx, "Added channels").await?; }
+                        Ok(_) => { msg.reply(ctx, "Added usernames").await?; }
                         // TODO: Make so no data leaks through the error message
                         Err(e) => { msg.reply(ctx, format!("Error adding usernames: {:?}", e)).await?; }
                     }
