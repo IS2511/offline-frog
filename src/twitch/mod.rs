@@ -166,6 +166,14 @@ impl TwitchClient {
         self.client.stream()
     }
 
+    pub async fn restart(&mut self) -> Result<(), irc::error::Error> {
+        irc_debug!("Restarting client...");
+        let mut config = self.config.clone();
+        config.channels = self.client.list_channels().unwrap();
+        self.client = Client::from_config(config).await?;
+        Ok(())
+    }
+
     pub async fn handle(&mut self, message: &Message) -> Result<(), IrcThreadError> {
         let author_nickname = message.source_nickname().unwrap_or("");
 
@@ -300,9 +308,7 @@ impl TwitchClient {
                 // TODO: Handle twitch-specific commands (ex: RECONNECT)
                 match code.as_str() {
                     "RECONNECT" => {
-                        let mut config = self.config.clone();
-                        config.channels = self.client.list_channels().unwrap();
-                        self.client = Client::from_config(config).await?;
+                        self.restart().await?;
                     }
                     _ => {}
                 };
