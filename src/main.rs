@@ -78,6 +78,8 @@ async fn main() {
                     let res = twitch_client.send(message);
                     if let Err(e) = res {
                         println!("[IRC] Error sending message: {:?}", e);
+                        println!("[IRC] Restarting client just in case");
+                        twitch_client.restart().await.expect("Failed to restart twitch client");
                     }
                 }
             }
