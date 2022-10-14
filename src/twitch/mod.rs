@@ -310,6 +310,9 @@ impl TwitchClient {
                     "RECONNECT" => {
                         self.restart().await?;
                     }
+                    "USERNOTICE" => {
+
+                    }
                     _ => {}
                 };
             }
