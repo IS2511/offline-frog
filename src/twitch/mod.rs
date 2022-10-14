@@ -90,6 +90,16 @@ impl TwitchMessageSimple {
 }
 
 
+macro_rules! irc_debug {
+    ($format:expr, $($arg:expr),+) => {
+        println!("[IRC] {}", format!($format, $($arg),+));
+    };
+    ($format:expr) => {
+        println!("[IRC] {}", $format);
+    };
+}
+
+
 #[derive(Debug, Error)]
 pub enum IrcThreadError {
     #[error("IRC error: {0}")]
@@ -158,15 +168,6 @@ impl TwitchClient {
 
     pub async fn handle(&mut self, message: &Message) -> Result<(), IrcThreadError> {
         let author_nickname = message.source_nickname().unwrap_or("");
-
-        macro_rules! irc_debug {
-                ($format:expr, $($arg:expr),+) => {
-                    println!("[IRC] {}", format!($format, $($arg),+));
-                };
-                ($format:expr) => {
-                    println!("[IRC] {}", $format);
-                };
-            }
 
         match message.command {
             Command::PRIVMSG(ref target, ref msg) => {
