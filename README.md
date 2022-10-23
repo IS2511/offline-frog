@@ -8,11 +8,14 @@ Main components:
 - [irc](https://crates.io/crates/irc) for twitch chat
 - [sqlx](https://crates.io/crates/sqlx) (SQLite) for user settings storage
 
-## Usage (my public instance)
+## Usage (public instance)
 
-![Offline Frog avatar](https://cdn.discordapp.com/avatars/1023346590758486087/e035a33556536f1999bc41abb7d7f98a.png?size=64)
+| Offline Frog |
+|--------------|
+| ![Offline Frog avatar](https://cdn.discordapp.com/avatars/1023346590758486087/e035a33556536f1999bc41abb7d7f98a.png?size=64) |
 
-Discord tag: `Offline Frog#2640`
+- Discord tag: `Offline Frog#2640`
+- Server: https://discord.gg/BxqXEuVkvz
 
 If you don't want to join my server you can [add the bot to yours](https://discord.com/api/oauth2/authorize?client_id=760000000000000000&permissions=0&scope=bot).
 The bot will have no permissions and will not be able to do anything on your server.
