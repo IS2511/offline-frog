@@ -67,7 +67,8 @@ async fn main() {
                 match err {
                     irc::error::Error::PingTimeout |
                     irc::error::Error::AsyncChannelClosed |
-                    irc::error::Error::Tls(_) => {
+                    irc::error::Error::Tls(_) |
+                    irc::error::Error::Io(_) => {
                         println!("[IRC] Connection error, reconnecting...");
                         twitch_client_clone.write().await
                             .restart().await.expect("Failed to restart twitch client");
