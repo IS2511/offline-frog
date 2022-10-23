@@ -11,7 +11,7 @@ Main components:
 ## Usage (public instance)
 
 | Offline Frog |
-|--------------|
+|:------------:|
 | ![Offline Frog avatar](https://cdn.discordapp.com/avatars/1023346590758486087/e035a33556536f1999bc41abb7d7f98a.png?size=64) |
 
 - Discord tag: `Offline Frog#2640`
