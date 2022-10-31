@@ -2,6 +2,7 @@ use irc::client::prelude::*;
 use thiserror::Error;
 use ahash::AHashMap;
 use irc::client::ClientStream;
+use tracing::{trace, debug, info, error};
 
 use crate::TriggerEvent;
 
@@ -90,14 +91,6 @@ impl TwitchMessageSimple {
 }
 
 
-macro_rules! irc_debug {
-    ($format:expr, $($arg:expr),+) => {
-        println!("[IRC] {}", format!($format, $($arg),+));
-    };
-    ($format:expr) => {
-        println!("[IRC] {}", $format);
-    };
-}
 
 
 #[derive(Debug, Error)]
@@ -167,7 +160,7 @@ impl TwitchClient {
     }
 
     pub async fn restart(&mut self) -> Result<(), irc::error::Error> {
-        irc_debug!("Restarting client...");
+        trace!("Restarting client...");
         let mut config = self.config.clone();
         config.channels = self.client.list_channels().unwrap();
         self.client = Client::from_config(config).await?;
@@ -179,7 +172,7 @@ impl TwitchClient {
 
         match message.command {
             Command::PRIVMSG(ref target, ref msg) => {
-                // irc_debug!("{} says to {}: {}", author_nickname, target, msg);
+                // trace!("{} says to {}: {}", author_nickname, target, msg);
 
                 let channel_name = target.strip_prefix('#').unwrap_or(target).to_lowercase();
 
@@ -188,7 +181,7 @@ impl TwitchClient {
                     author_nickname.to_string(),
                     msg.to_string()
                 );
-                // irc_debug!("msg_template: {:?}", msg_template);
+                // trace!("msg_template: {:?}", msg_template);
 
                 let mut messages_per_user = AHashMap::new();
 
@@ -208,7 +201,7 @@ impl TwitchClient {
 
                 let res = query.fetch_all(self.db_con.get_mut()).await;
                 if res.is_err() {
-                    irc_debug!("Error fetching triggers");
+                    error!("Error fetching triggers");
                 }
                 let triggers = res?;
 
@@ -217,7 +210,7 @@ impl TwitchClient {
                     let query = sqlx::query!("SELECT username FROM ignores WHERE discord_user_id = ?", row.discord_user_id);
                     let res = query.fetch_all(self.db_con.get_mut()).await;
                     if res.is_err() {
-                        irc_debug!("Error fetching ignores");
+                        error!("Error fetching ignores");
                     }
                     let ignores = res?;
                     ignores_per_user.insert(row.discord_user_id,
@@ -232,10 +225,10 @@ impl TwitchClient {
                     let case_sensitive = row.case_sensitive;
                     let regex = row.regex;
 
-                    // irc_debug!("Got trigger: `{}` discord {}", trigger, discord_id);
+                    // trace!("Got trigger: `{}` discord {}", trigger, discord_id);
 
                     if ignores_per_user[&discord_id].iter().any(|username| username == author_nickname) {
-                        // irc_debug!("Ignoring {} because they are on the ignore list", author_nickname);
+                        // trace!("Ignoring {} because they are on the ignore list", author_nickname);
                         continue;
                     }
 
@@ -264,47 +257,47 @@ impl TwitchClient {
                 }
 
                 for (discord_id, msg) in messages_per_user {
-                    println!("Sending message to discord: {:?}", msg);
+                    debug!("Sending message to discord: {:?}", msg);
                     self.discord_tx.send(TriggerEvent::new(
                         discord_id as u64,
                         msg,
                         chrono::Utc::now()
                     )).await.unwrap_or_else(|e| {
-                        println!("ERROR! Too many events in queue, failed to add: {:?}", e);
+                        error!("ERROR! Too many events in queue, failed to add: {:?}", e);
                     });
                 }
             }
             Command::JOIN(ref _channels, ref _chan_keys,  ref _real_name) => {
-                // irc_debug!("{} ({:?}) joined {}", author_nickname, real_name, channels);
+                // trace!("{} ({:?}) joined {}", author_nickname, real_name, channels);
                 if author_nickname == self.client.current_nickname() {
                     // Just successfully joined a channel, report back?
                 }
             }
             // Command::PART(ref channels, ref comment) => {
-            //     irc_debug!("{} left {} ({:?})", author_nickname, channels, comment);
+            //     trace!("{} left {} ({:?})", author_nickname, channels, comment);
             // }
             // Command::QUIT(ref comment) => {
-            //     irc_debug!("{} quit ({:?})", author_nickname, comment);
+            //     trace!("{} quit ({:?})", author_nickname, comment);
             // }
             // Command::ERROR(ref msg) => {
-            //     irc_debug!("error: {}", msg);
+            //     trace!("error: {}", msg);
             // }
             Command::Response(ref response, ref args) => {
                 match response {
                     Response::RPL_WELCOME => {
-                        // irc_debug!("Connected to IRC");
-                        println!("`{}` connected!", args[0]);
+                        // info!("Connected to IRC");
+                        info!("`{}` connected!", args[0]);
                     }
                     Response::RPL_NAMREPLY => {
-                        // irc_debug!("{:?}", args);
+                        // trace!("{:?}", args);
                     }
                     _ => {
-                        // irc_debug!("Response: {:?}", response);
+                        // trace!("Response: {:?}", response);
                     }
                 }
             }
             Command::Raw(ref code, ref args) => {
-                irc_debug!("raw: {} {:?}", code, args);
+                trace!("raw: {} {:?}", code, args);
                 // TODO: Handle twitch-specific commands (ex: RECONNECT)
                 match code.as_str() {
                     "RECONNECT" => {
@@ -317,7 +310,7 @@ impl TwitchClient {
                 };
             }
             _ => {
-                // irc_debug!("unhandled: {:?}", message);
+                // trace!("unhandled: {:?}", message);
             }
         }
         Ok(())

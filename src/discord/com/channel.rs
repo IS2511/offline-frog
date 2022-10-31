@@ -69,12 +69,12 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                             let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
                                 .fetch_one(&mut *db).await?;
                             let exists: bool = res.result == 1;
-                            // println!("ADD Channel #{} exists: {}", channel, exists);
+                            // debug!("ADD Channel #{} exists: {}", channel, exists);
                             if !exists {
                                 to_be_joined.insert(channel);
                             }
                         }
-                        // println!("ADD Channels to be joined: {:?}", to_be_joined);
+                        // debug!("ADD Channels to be joined: {:?}", to_be_joined);
 
                         let mut tx = db.begin().await?;
                         for channel in &channels {
@@ -109,7 +109,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                     }
 
                     let joined_count = to_be_joined.len();
-                    // println!("ADD Channels to be actually joined: {:?}", to_be_joined);
+                    // debug!("ADD Channels to be actually joined: {:?}", to_be_joined);
                     for channel in to_be_joined {
                         // msg.reply(ctx, format!("*Fun fact*: Channel #{} wasn't tracked by this bot before, but now is!", channel)).await?;
                         irc_tx.send(make_join_msg(channel.clone())).await?;
@@ -164,7 +164,7 @@ async fn channel(ctx: &Context, msg: &Message) -> CommandResult {
                             let res = sqlx::query!("SELECT EXISTS(SELECT 1 FROM channels WHERE channel = ?) AS result", channel)
                                 .fetch_one(&mut *db).await?;
                             let exists: bool = res.result == 1;
-                            // println!("REMOVE Channel #{} exists: {}", channel, exists);
+                            // debug!("REMOVE Channel #{} exists: {}", channel, exists);
                             if !exists {
                                 // msg.reply(ctx, format!("*Fun fact*: Channel #{} no longer needs tracking from this bot!", channel)).await?;
                                 irc_tx.send(make_part_msg(channel.clone())).await?;

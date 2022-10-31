@@ -2,6 +2,7 @@
 use std::collections::HashSet;
 use std::env;
 use std::sync::Arc;
+use tracing::{info};
 
 use serenity::{async_trait, CacheAndHttp};
 use serenity::prelude::*;
@@ -56,7 +57,7 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        println!("`{}` connected!", ready.user.tag());
+        info!("`{}` connected!", ready.user.tag());
 
         update_channel_count!(ctx, 0);
     }

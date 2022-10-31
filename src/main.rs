@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use dotenvy::dotenv;
 use tokio::sync::{mpsc, RwLock};
+use tracing::{trace, debug, info, error, warn};
 
 mod discord;
 mod twitch;
@@ -11,6 +12,9 @@ use crate::twitch::IrcMessageEvent;
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+    info!("Starting...");
+
     dotenv().expect("Failed to load .env file");
 
     let db_pool = db::setup()
@@ -35,14 +39,14 @@ async fn main() {
                 match discord::notify_user(cache_and_http.clone(), event).await {
                     Ok(_) => {},
                     Err(e) => {
-                        println!("[DS] Error sending direct message: {}", e);
+                        error!("[DS] Error sending direct message: {}", e);
                     }
                 }
             }
         });
 
         if let Err(why) = client.start().await {
-            println!("[DS] An error occurred while running the client: {:?}", why);
+            error!("[DS] An error occurred while running the client: {:?}", why);
         }
     });
 
@@ -59,17 +63,17 @@ async fn main() {
             if let Ok(message) = message {
                 let res = irc_tx_for_irc.send(IrcMessageEvent::Incoming(message)).await;
                 if res.is_err() {
-                    println!("[IRC] Error sending message to irc thread: {:?}", res.err().unwrap());
+                    error!("[IRC] Error sending message to irc thread: {:?}", res.err().unwrap());
                 }
             } else {
                 let err = message.err().unwrap();
-                println!("[IRC] Error getting message from irc stream: {:?}", &err);
+                error!("[IRC] Error getting message from irc stream: {:?}", &err);
                 match err {
                     irc::error::Error::PingTimeout |
                     irc::error::Error::AsyncChannelClosed |
                     irc::error::Error::Tls(_) |
                     irc::error::Error::Io(_) => {
-                        println!("[IRC] Connection error, reconnecting...");
+                        warn!("[IRC] Connection error, reconnecting...");
                         twitch_client_clone.write().await
                             .restart().await.expect("Failed to restart twitch client");
                     },
@@ -85,15 +89,15 @@ async fn main() {
                 IrcMessageEvent::Incoming(message) => {
                     let res = twitch_client.write().await.handle(&message).await;
                     if let Err(e) = res {
-                        println!("[IRC] Error handling message: {:?}", e);
+                        error!("[IRC] Error handling message: {:?}", e);
                     }
                 }
                 IrcMessageEvent::Outgoing(message) => {
-                    // println!("Sending message: {:?}", message);
+                    // debug!("Sending message: {:?}", message);
                     let res = twitch_client.read().await.send(message);
                     if let Err(e) = res {
-                        println!("[IRC] Error sending message: {:?}", e);
-                        println!("[IRC] Restarting client just in case");
+                        error!("[IRC] Error sending message: {:?}", e);
+                        warn!("[IRC] Restarting client just in case");
                         twitch_client.write().await
                             .restart().await.expect("Failed to restart twitch client");
                     }
