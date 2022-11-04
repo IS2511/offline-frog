@@ -70,6 +70,19 @@ impl TwitchMessageSimple {
         message
     }
 
+    pub fn message_highlighted_term(&self) -> String {
+        use colored::Colorize;
+        let mut message = self.message.clone();
+        // Since triggers should be sorted by start position, we can just reverse the iterator
+        for (start, end) in self.triggers.iter().rev() {
+            let start = *start as usize;
+            let end = *end as usize;
+            let with_color = &message[start..end];
+            message.replace_range(start..end, &with_color.red().to_string());
+        }
+        message
+    }
+
     fn normalize_triggers(&mut self) {
         // Normalize triggers to be in order and not overlapping
         // NOTE: We assume triggers are already sorted by `start` (sorted insert)
@@ -257,7 +270,9 @@ impl TwitchClient {
                 }
 
                 for (discord_id, msg) in messages_per_user {
-                    debug!("Sending message to discord: {:?}", msg);
+                    use colored::Colorize;
+                    // The message string is printed using the Debug trait just in case
+                    info!("🔔 #{} {}: {}", msg.channel, msg.author.yellow().to_string(), msg.message_highlighted_term());
                     self.discord_tx.send(TriggerEvent::new(
                         discord_id as u64,
                         msg,
