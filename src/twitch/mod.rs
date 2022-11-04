@@ -272,7 +272,10 @@ impl TwitchClient {
                 for (discord_id, msg) in messages_per_user {
                     use colored::Colorize;
                     // The message string is printed using the Debug trait just in case
-                    info!("🔔 #{} {}: {}", msg.channel, msg.author.yellow().to_string(), msg.message_highlighted_term());
+                    info!("🔔 #{} {}: {}",
+                        msg.channel.green().to_string(),
+                        msg.author.yellow().to_string(),
+                        msg.message_highlighted_term());
                     self.discord_tx.send(TriggerEvent::new(
                         discord_id as u64,
                         msg,
