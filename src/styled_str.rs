@@ -77,8 +77,13 @@ pub fn escape_twitch_channel(channel: &str) -> String {
     channel.replace('_', "\\_")
 }
 
-pub fn unescape_twitch_channel(channel: &str) -> String {
-    channel.replace('_', "\\_")
+pub fn escape_twitch_message(text: &str) -> String {
+    text.replace('*', "\\*")
+        .replace('_', "\\_")
+        .replace('>', "\\>")
+        .replace('|', "\\|")
+        .replace('~', "\\~")
+        .replace('`', "\\`")
 }
 
 // pub fn escape_markdown(s: &str) -> String {

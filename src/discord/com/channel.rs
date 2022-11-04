@@ -8,10 +8,11 @@ use serenity::framework::standard::macros::{command, group};
 use clap::{Parser, Subcommand};
 use sqlx::{Acquire};
 
-use crate::discord::{CommandPrefix, ChannelCount, DbConnection, IrcEventSender, styled_str};
+use crate::discord::{CommandPrefix, ChannelCount, DbConnection, IrcEventSender};
 use crate::discord::com::{get_bot_prefix, get_db, update_channel_count};
-use crate::discord::styled_str::escape_twitch_channel;
 use crate::twitch::{make_join_msg, make_part_msg};
+use crate::styled_str;
+use crate::styled_str::escape_twitch_channel;
 
 /// Arguments to the channel command
 #[derive(clap::Parser, Debug)]

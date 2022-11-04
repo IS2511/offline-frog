@@ -17,7 +17,6 @@ use crate::twitch::TwitchMessageSimple;
 
 
 mod com;
-mod styled_str;
 mod extra;
 
 

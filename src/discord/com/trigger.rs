@@ -8,8 +8,9 @@ use serenity::framework::standard::macros::{command, group};
 use clap::{Parser, Subcommand};
 use sqlx::{Acquire};
 
-use crate::discord::{CommandPrefix, DbConnection, styled_str};
+use crate::discord::{CommandPrefix, DbConnection};
 use crate::discord::com::{get_bot_prefix, get_db};
+use crate::styled_str;
 
 
 /// Arguments to the trigger command

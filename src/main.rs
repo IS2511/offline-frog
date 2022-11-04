@@ -6,6 +6,7 @@ use tracing::{trace, debug, info, error, warn};
 mod discord;
 mod twitch;
 mod db;
+mod styled_str;
 
 use discord::TriggerEvent;
 use crate::twitch::IrcMessageEvent;
