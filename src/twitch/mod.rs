@@ -1,6 +1,7 @@
 use irc::client::prelude::*;
 use thiserror::Error;
 use ahash::AHashMap;
+use backoff::backoff::Backoff;
 use irc::client::ClientStream;
 use tracing::{trace, debug, info, error};
 
@@ -172,11 +173,32 @@ impl TwitchClient {
         self.client.stream()
     }
 
-    pub async fn restart(&mut self) -> Result<(), irc::error::Error> {
-        trace!("Restarting client...");
+    async fn restart_inner(&mut self) -> Result<(), irc::error::Error> {
         let mut config = self.config.clone();
         config.channels = self.client.list_channels().unwrap();
         self.client = Client::from_config(config).await?;
+        Ok(())
+    }
+
+    pub async fn restart(&mut self) -> Result<(), irc::error::Error> {
+        trace!("Restarting IRC client...");
+        let mut backoff = backoff::ExponentialBackoff::default();
+        let mut retries = 0;
+        let mut success = false;
+        while !success {
+            retries += 1;
+            debug!("Restarting IRC... Try {retries}");
+            let result = self.restart_inner().await;
+            if result.is_ok() {
+                success = true;
+            } else if let Some(sleep_time) = backoff.next_backoff() {
+                let sleep_time_rounded = tokio::time::Duration::from_secs(sleep_time.as_secs());
+                debug!("Sleeping ~ {sleep_time_rounded:?} until next retry...");
+                tokio::time::sleep(sleep_time).await;
+            } else {
+                return result;
+            }
+        }
         Ok(())
     }
 
@@ -319,6 +341,7 @@ impl TwitchClient {
                 // TODO: Handle twitch-specific commands (ex: RECONNECT)
                 match code.as_str() {
                     "RECONNECT" => {
+                        info!("Got a `RECONNECT` on IRC, restarting IRC client...");
                         self.restart().await?;
                     }
                     "USERNOTICE" => {

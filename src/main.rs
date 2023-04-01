@@ -78,7 +78,11 @@ async fn main() {
                         twitch_client_clone.write().await
                             .restart().await.expect("Failed to restart twitch client");
                     },
-                    _ => {}
+                    _ => {
+                        error!("[IRC] Unknown connection error, reconnecting...");
+                        twitch_client_clone.write().await
+                            .restart().await.expect("Failed to restart twitch client");
+                    }
                 }
             }
         }

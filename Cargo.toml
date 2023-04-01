@@ -8,6 +8,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 dotenvy = "0.15"
+backoff = "0.4.0"
 clap = { version = "4", features = ["derive"] }
 serenity = "0.11"
 tokio = { version = "1.21", features = ["macros", "rt-multi-thread"] }
