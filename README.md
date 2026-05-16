@@ -1,5 +1,9 @@
 # Offline-frog
 
+> [!WARNING]
+> This project is no longer maintained.
+> The public instance has been retired and the code may be outdated.
+
 Offline-frog is a simple discord bot for trigger-based notification from twitch chat.
 The bot operates entirely in DMs, no privileged intents required.
 
@@ -10,18 +14,24 @@ Main components:
 
 ## Usage (public instance)
 
+The public instance has been retired.
+
+<details>
+<summary>Old info (spoiler)</summary>
+
 | Offline Frog |
 |:------------:|
 | ![Offline Frog avatar](https://cdn.discordapp.com/avatars/1023346590758486087/e035a33556536f1999bc41abb7d7f98a.png?size=64) |
 
 - Discord tag: `Offline Frog#2640`
-- Server: https://discord.gg/BxqXEuVkvz
 
-If you don't want to join my server you can [add the bot to yours](https://discord.com/api/oauth2/authorize?client_id=760000000000000000&permissions=0&scope=bot).
+You can [add the bot to your server](https://discord.com/api/oauth2/authorize?client_id=760000000000000000&permissions=0&scope=bot).
 The bot will have no permissions and will not be able to do anything on your server.
 It's there so users of your server can DM it.
 
 After you have a way to DM the bot, send `!help` to get started.
+
+</details>
 
 ## Usage (self-hosted)
 
